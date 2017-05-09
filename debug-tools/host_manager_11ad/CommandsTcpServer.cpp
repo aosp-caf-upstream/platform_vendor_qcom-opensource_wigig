@@ -86,11 +86,17 @@ void CommandsTcpServer::ServerThread(NetworkInterfaces::NetworkInterface client)
     do
     {
         string messages;
-        messages.empty();
 
         try
         {
-            messages = client.Receive();
+            const char* concatenatedMessages = client.Receive();
+            if (concatenatedMessages == NULL)
+            {
+                keepConnectionAliveFromReply = CLOSE_CONNECTION;
+                break;
+            }
+
+            messages = concatenatedMessages;
             vector<string> splitMessages = Utils::Split(messages, '\r');
 
             for (auto& message : splitMessages)

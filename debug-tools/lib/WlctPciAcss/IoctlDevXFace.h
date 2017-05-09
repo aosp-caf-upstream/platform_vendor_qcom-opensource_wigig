@@ -34,35 +34,35 @@
 class IIoctlDev
 {
 public:
-  IIoctlDev(const TCHAR* tchDeviceName)
-  {
-    WLCT_ASSERT(tchDeviceName != NULL);
-    WLCT_ASSERT(sizeof(szInterfaceName) > _tcslen(tchDeviceName));
-    _tcscpy_s(szInterfaceName, INTERFACE_NAME_LENGTH, tchDeviceName);
-  }
+    IIoctlDev(const TCHAR* tchDeviceName)
+    {
+        WLCT_ASSERT(tchDeviceName != NULL);
+        WLCT_ASSERT(sizeof(szInterfaceName) > _tcslen(tchDeviceName));
+        _tcscpy_s(szInterfaceName, INTERFACE_NAME_LENGTH, tchDeviceName);
+    }
 
-  virtual ~IIoctlDev()
-  {
+    virtual ~IIoctlDev()
+    {
 
-  }
+    }
 
-  virtual bool          IsOpened(void) = 0;
+    virtual bool          IsOpened(void) = 0;
 
-  virtual wlct_os_err_t Open() = 0;
-  virtual wlct_os_err_t Ioctl(uint32_t Id,
-                              const void *inBuf, uint32_t inBufSize,
-                              void *outBuf, uint32_t outBufSize) = 0;
-  virtual wlct_os_err_t DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DWORD DebugFSFlags){
-	  //do something with params
-    (void)FileName;
-    (void)dataBuf;
-    (void)dataBufLen;
-    (void)DebugFSFlags;
-    return -1;
-  }
-  virtual void          Close() = 0;
+    virtual wlct_os_err_t Open() = 0;
+    virtual wlct_os_err_t Ioctl(uint32_t Id,
+                                const void *inBuf, uint32_t inBufSize,
+                                void *outBuf, uint32_t outBufSize) = 0;
+    virtual wlct_os_err_t DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DWORD DebugFSFlags){
+        //do something with params
+        (void)FileName;
+        (void)dataBuf;
+        (void)dataBufLen;
+        (void)DebugFSFlags;
+        return -1;
+    }
+    virtual void          Close() = 0;
 
 protected:
-  static const size_t INTERFACE_NAME_LENGTH = 256;
-  TCHAR szInterfaceName[INTERFACE_NAME_LENGTH];
+    static const size_t INTERFACE_NAME_LENGTH = 256;
+    TCHAR szInterfaceName[INTERFACE_NAME_LENGTH];
 };

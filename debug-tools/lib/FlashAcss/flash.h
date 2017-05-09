@@ -48,25 +48,29 @@
 
 extern "C"
 {
-class FLSHACSS_CPP_API flash_base
-{
-public:
+    class FLSHACSS_CPP_API flash_base
+    {
+    public:
 	enum {
-		//FLASH_SIZE_SWIFT = 256*1024,
-		FLASH_SIZE_SPARROW = 1024*512,
-		//FLASH_SIZE_MARLON = 1024*1024,
-		FLASH_SIZE_MARLON = 1024*512,
-		FLASH_SIZE_TALYN = 1024*512*4
+            //FLASH_SIZE_SWIFT = 256*1024,
+            FLASH_SIZE_SPARROW = 1024*512,
+            //FLASH_SIZE_MARLON = 1024*1024,
+            FLASH_SIZE_MARLON = 1024*512,
+            FLASH_SIZE_TALYN = 1024*512*4
 	};
 	flash_base(DType device_type)
+        : m_bExit(false)
+        , deviceType(device_type)
+        , m_size(0)
 	{
-		m_bExit = false;
-		if (device_type == MST_SPARROW)
-			m_size = FLASH_SIZE_SPARROW;
-		if (device_type == MST_MARLON)
-			m_size = FLASH_SIZE_MARLON;
-		if (device_type == MST_TALYN)
-			m_size = FLASH_SIZE_TALYN;
+            if (device_type == MST_SPARROW)
+                m_size = FLASH_SIZE_SPARROW;
+            if (device_type == MST_MARLON)
+                m_size = FLASH_SIZE_MARLON;
+            if (device_type == MST_TALYN)
+                m_size = FLASH_SIZE_TALYN;
+            else
+                m_size = FLASH_SIZE_TALYN;
 	};
 	virtual ~flash_base(void) {};
 	virtual int open (const char *device_name, DType dtype, bool ignore_lock) = 0;
@@ -209,9 +213,9 @@ public:
         virtual int open (void *m_pDeviceAccss, DType dtype, bool ignore_lock)
         {
             //do something with params
-		    (void)m_pDeviceAccss;
-		    (void)dtype;
-		    (void)ignore_lock;
+            (void)m_pDeviceAccss;
+            (void)dtype;
+            (void)ignore_lock;
             return -1;
         }
         virtual void close ();
