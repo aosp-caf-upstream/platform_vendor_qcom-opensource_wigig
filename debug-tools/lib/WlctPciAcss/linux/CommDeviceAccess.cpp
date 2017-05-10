@@ -31,142 +31,142 @@
 
 CComPortDeviceAccess::CComPortDeviceAccess(const TCHAR* tchDeviceName, DType devType)
 {
-  //do something with params
-	(void)tchDeviceName;
-	(void)devType;
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    //do something with params
+    (void)tchDeviceName;
+    (void)devType;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
 }
 
 int CComPortDeviceAccess::InitDevice()
 {
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 CComPortDeviceAccess::~CComPortDeviceAccess()
 {
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
 }
 
 int CComPortDeviceAccess::GetType()
 {
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 int CComPortDeviceAccess::CloseDevice()
 {
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 int CComPortDeviceAccess::r2(DWORD addr, DWORD & val)
 {
-  //do something with params
-	(void)addr;
-	(void)val;
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    //do something with params
+    (void)addr;
+    (void)val;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 int CComPortDeviceAccess::w2(DWORD addr, DWORD val)
 {
-  //do something with params
-	(void)addr;
-	(void)val;
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    //do something with params
+    (void)addr;
+    (void)val;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 int CComPortDeviceAccess::w32(DWORD addr, DWORD val)
 {
-  //do something with params
-	(void)addr;
-	(void)val;
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    //do something with params
+    (void)addr;
+    (void)val;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 int CComPortDeviceAccess::rb(DWORD addr, DWORD blockSize, char *arrBlock)
 {
-  //do something with params
-	(void)addr;
-	(void)blockSize;
-	(void)arrBlock;
+    //do something with params
+    (void)addr;
+    (void)blockSize;
+    (void)arrBlock;
 
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 int CComPortDeviceAccess::wb(DWORD addr, DWORD blockSize, const char *arrBlock)
 {
-  //do something with params
-	(void)addr;
-	(void)blockSize;
-	(void)arrBlock;
+    //do something with params
+    (void)addr;
+    (void)blockSize;
+    (void)arrBlock;
 
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 int CComPortDeviceAccess::rr(DWORD addr, DWORD num_repeat, DWORD *arrBlock)
 {
-  //do something with params
-	(void)addr;
-	(void)num_repeat;
-	(void)arrBlock;
+    //do something with params
+    (void)addr;
+    (void)num_repeat;
+    (void)arrBlock;
 
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 int CComPortDeviceAccess::getFwDbgMsg(FW_DBG_MSG** pMsg)
 {
-  //do something with params
-	(void)pMsg;
+    //do something with params
+    (void)pMsg;
 
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 int CComPortDeviceAccess::clearAllFwDbgMsg()
 {
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 int CComPortDeviceAccess::do_reset(BOOL bFirstTime)
 {
-  //do something with params
-	(void)bFirstTime;
+    //do something with params
+    (void)bFirstTime;
 
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 int CComPortDeviceAccess::do_sw_reset()
 {
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 
 int CComPortDeviceAccess::r32(DWORD addr, DWORD & val)
 {
-  //do something with params
-	(void)addr;
-	(void)val;
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    //do something with params
+    (void)addr;
+    (void)val;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 int CComPortDeviceAccess::r4(DWORD addr, DWORD & val)
 {
-  //do something with params
-	(void)addr;
-	(void)val;
-  LOG_MESSAGE_ERROR(_T("Not Supported\n"));
-  return 0;
+    //do something with params
+    (void)addr;
+    (void)val;
+    LOG_MESSAGE_ERROR(_T("Not Supported\n"));
+    return 0;
 }
 
 

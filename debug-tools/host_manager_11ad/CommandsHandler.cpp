@@ -70,16 +70,18 @@ ResponseMessage CommandsHandler::GetInterfaces(vector<string> arguments, unsigne
             // create one string that contains all connected devices
             stringstream devicesSs;
             bool firstTime = true;
-            for (auto device : devices)
+
+            for (std::set<string>::const_iterator it = devices.begin(); it != devices.end(); ++it)
             {
                 if (firstTime)
                 {
-                    devicesSs << device;
+                    devicesSs << *it;
                     firstTime = false;
                     continue;
                 }
-                devicesSs << m_device_delimiter << device;
+                devicesSs << m_device_delimiter << *it;
             }
+
             response.message = DecorateResponseMessage(true, devicesSs.str());
         }
     }
@@ -583,8 +585,8 @@ ResponseMessage CommandsHandler::SetDriverMode(vector<string> arguments, unsigne
     ResponseMessage response;
     if (ValidArgumentsNumber(__FUNCTION__, numberOfArguments, 2, response.message))
     {
-        int newMode;
-        int oldMode;
+        int newMode = IOCTL_WBE_MODE;
+        int oldMode = IOCTL_WBE_MODE;
 
         if ("WBE_MODE" == arguments[1])
         {

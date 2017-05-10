@@ -96,7 +96,7 @@ HostIps UdpTempOsAbstruction::GetHostIps()
     }
     else
     {
-        strncpy(ifr.ifr_name, "br-lan", IFNAMSIZ - 1);
+        snprintf(ifr.ifr_name, IFNAMSIZ - 1, "br-lan");
         if (ioctl(fd, SIOCGIFADDR, &ifr) >= 0)
         {
             LOG_INFO << "OpenWRT OS" << std::endl;
