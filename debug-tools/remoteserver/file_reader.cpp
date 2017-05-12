@@ -37,7 +37,7 @@
 // *************************************************************************************************
 
 FileReader::FileReader(const char* pFileName)
-    : m_FileName(pFileName)
+    : m_FileName(pFileName ? pFileName : "")
     , m_pFile(NULL)
     , m_FileSize(0)
     , m_ReadTillNow(0)
