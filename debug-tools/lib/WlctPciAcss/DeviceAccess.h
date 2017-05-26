@@ -100,7 +100,7 @@ public:
     virtual int getSamplingData(DWORD** pDataSamples)
     {
         //do something with params
-    	(void)pDataSamples;
+        (void)pDataSamples;
         LOG_MESSAGE_ERROR(_T("NOT IMPLEMENTED"));
         return WLCT_OS_ERROR_CALL_NOT_IMPLEMENTED;
     }

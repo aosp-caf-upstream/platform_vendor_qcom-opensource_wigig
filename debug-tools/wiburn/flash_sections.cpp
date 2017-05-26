@@ -1024,7 +1024,7 @@ void usb_info_section_t<PRODUCT>::init(flash_base *fl)
         fl->read(header_address+offset, sizeof (tag_header_t), (BYTE*)&tag_header);
         offset += sizeof (tag_header_t);
 
-        tag_base_t *tag = nullptr;
+        tag_base_t *tag = NULL;
         switch (tag_header.tag_id) {
         case usb_format_version_tag_id: {
             tag = new tag_t<format_version_tag_t> (tag_header.tag_id, "usb_format_version");

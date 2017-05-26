@@ -124,10 +124,12 @@ const char* NetworkInterface::Receive(int size, int flags)
     if (m_bufferSize <= size + 1)
     {
         m_buffer = (char*)(realloc(m_buffer, sizeof(char) * (size + 1)));
+        if (!m_buffer) return NULL;
         m_bufferSize = size;
     }
 
     int bytesReceived = recv(m_fileDescriptor, m_buffer, size, flags);
+    if (0 > bytesReceived) return NULL;
     m_buffer[bytesReceived] = '\0';
 
     return m_buffer;
