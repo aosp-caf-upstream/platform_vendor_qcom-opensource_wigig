@@ -36,7 +36,7 @@ EventsTcpServer::EventsTcpServer(unsigned int eventsTcpPort)
 
 void EventsTcpServer::Start()
 {
-    LOG_INFO << "Starting events TCP server on port " << m_port << endl;
+    //LOG_INFO << "Starting events TCP server on port " << m_port << endl;
     m_pSocket->Bind(m_port);
     m_pSocket->Listen();
 
@@ -46,7 +46,7 @@ void EventsTcpServer::Start()
     {
         try
         {
-			NetworkInterfaces::NetworkInterface newClient = m_pSocket->Accept();
+            NetworkInterfaces::NetworkInterface newClient = m_pSocket->Accept();
             //LOG_INFO << "Adding a new client to the Events TCP Server: " << newClient.getPeerName() << endl;
             //using unique_lock promises that in case of exception the mutex is unlocked:
             unique_lock<mutex> clientsVectorLock(clientsVectorMutex);
@@ -70,7 +70,7 @@ bool EventsTcpServer::SendToAllConnectedClients(string message)
         {
             try
             {
-                int bytesSent = (*client).Send(message);
+                int bytesSent = client->SendString(message);
                 if (bytesSent == 0)
                 { //it means the client had disconnected, remove the client from the clients list
                     LOG_WARNING << "Client: " << (*client).GetPeerName() << " has disconnected, removing from the clients list" << endl;
@@ -107,4 +107,5 @@ void EventsTcpServer::Stop()
 {
     LOG_INFO << "Stopping the events TCP server" << endl;
     m_pSocket->Shutdown(2); //type 2 -> Acts like the close(), shutting down both input and output
+    m_pSocket.reset();
 }

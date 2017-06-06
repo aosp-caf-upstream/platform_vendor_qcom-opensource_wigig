@@ -31,8 +31,12 @@
 #include "DebugLogger.h"
 
 #include <cerrno>
+#include <string.h>
+#include <stdlib.h>
 
 using namespace NetworkInterfaces;
+
+// *************************************************************************************************
 
 NetworkInterface::NetworkInterface()
 {
@@ -61,11 +65,14 @@ NetworkInterface::NetworkInterface()
     m_buffer = NULL;
 }
 
+// *************************************************************************************************
+
 NetworkInterface::NetworkInterface(int fileDescriptor)
     : m_fileDescriptor(fileDescriptor)
     , m_buffer(NULL)
     , m_bufferSize(0)
 {
+    UpdatePeerNameInternal();
 }
 
 // Establish Connections
@@ -82,6 +89,8 @@ void NetworkInterface::Bind(int port)
         exit(1);
     }
 }
+
+// *************************************************************************************************
 
 void NetworkInterface::Listen(int backlog)
 {
@@ -108,32 +117,110 @@ NetworkInterface NetworkInterface::Accept()
     return NetworkInterface(fileDescriptor);
 }
 
-// Send and Receive
-int NetworkInterface::Send(const std::string& data)
+// *************************************************************************************************
+
+bool NetworkInterface::SendString(const std::string& text)
 {
-    return send(m_fileDescriptor, data.c_str(), data.size(), 0);
+    LOG_DEBUG << "Sending text: " << PlainStr(text) << std::endl;
+    return SendBuffer(text.c_str(), text.size());
 }
 
-int NetworkInterface::Send(const char* data)
+// *************************************************************************************************
+
+bool NetworkInterface::SendString(const char* szText)
 {
-    return send(m_fileDescriptor, data, strlen(data), 0);
+    return SendBuffer(szText, strlen(szText));
 }
+
+// *************************************************************************************************
+
+bool NetworkInterface::SendBuffer(const char* pBuf, size_t bufSize)
+{
+    size_t sentSize = 0;
+    const char* pCurrent = pBuf;
+
+    while (sentSize < bufSize)
+    {
+        int chunkSize = send(m_fileDescriptor, pCurrent, bufSize - sentSize, 0);
+        if (chunkSize < 0)
+        {
+            LOG_ERROR << "Error sending data."
+                      << " Error: " << strerror(errno)
+                      << " Sent till now (B): " << sentSize
+                      << " To be sent (B): " << sentSize
+                      << std::endl;
+
+            return false;
+        }
+
+        sentSize += chunkSize;
+        pCurrent += chunkSize;
+
+        LOG_VERBOSE << "Sent data chunk."
+                    << " Chunk Size (B): " << chunkSize
+                    << " Sent till now (B): " << sentSize
+                    << " To be sent (B): " << bufSize
+                    << std::endl;
+    }
+
+    LOG_VERBOSE << "Buffer sent successfully."
+                << " Sent (B): " << sentSize
+                << " Buffer Size (B): " << bufSize
+                << std::endl;
+    LOG_ASSERT(sentSize == bufSize);
+
+    return true;
+}
+
+// *************************************************************************************************
 
 const char* NetworkInterface::Receive(int size, int flags)
 {
     if (m_bufferSize <= size + 1)
     {
         m_buffer = (char*)(realloc(m_buffer, sizeof(char) * (size + 1)));
-        if (!m_buffer) return NULL;
+        if (m_buffer == NULL)
+        {
+            return NULL;
+        }
         m_bufferSize = size;
     }
 
+    memset(m_buffer, 0, m_bufferSize);
+
     int bytesReceived = recv(m_fileDescriptor, m_buffer, size, flags);
-    if (0 > bytesReceived) return NULL;
+    if (-1 == bytesReceived)
+    {
+        LOG_ERROR << "Error while receiving from a TCP socket: " << strerror(errno) << std::endl;
+        return NULL;
+    }
+	if (0 == bytesReceived)
+	{
+		LOG_INFO << "Connection closed by peer " << m_peerName << std::endl;
+		return NULL;
+	}
     m_buffer[bytesReceived] = '\0';
 
     return m_buffer;
 }
+
+// *************************************************************************************************
+
+const char* NetworkInterface::BinaryReceive(int size, int flags)
+{
+    if (m_bufferSize <= size)
+    {
+        m_buffer = (char*)(realloc(m_buffer, sizeof(char) * size));
+        m_bufferSize = size;
+    }
+
+    int bytesReceived = recv(m_fileDescriptor, m_buffer, size, flags);
+    m_buffer[bytesReceived] = '\0';
+
+    return m_buffer;
+}
+
+// *************************************************************************************************
 
 // Socket Closing Functions
 void NetworkInterface::Close()
@@ -146,6 +233,8 @@ void NetworkInterface::Close()
 #endif
 }
 
+// *************************************************************************************************
+
 void NetworkInterface::Shutdown(int type)
 {
 #ifdef _WINDOWS
@@ -155,7 +244,9 @@ void NetworkInterface::Shutdown(int type)
     shutdown(m_fileDescriptor, type);
 }
 
-const char* NetworkInterface::GetPeerName() const
+// *************************************************************************************************
+
+void NetworkInterface::UpdatePeerNameInternal()
 {
     struct sockaddr_in remoteAddress;
     socklen_t size = sizeof(remoteAddress);
@@ -166,5 +257,12 @@ const char* NetworkInterface::GetPeerName() const
         exit(1);
     }
 
-    return inet_ntoa(remoteAddress.sin_addr);
+    m_peerName = inet_ntoa(remoteAddress.sin_addr);
+}
+
+// *************************************************************************************************
+
+const char* NetworkInterface::GetPeerName() const
+{
+    return m_peerName.c_str();
 }

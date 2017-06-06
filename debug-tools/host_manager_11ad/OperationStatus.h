@@ -27,47 +27,44 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _FILE_READER_H_
-#define _FILE_READER_H_
+#ifndef _OPERATION_STATUS_H_
+#define _OPERATION_STATUS_H_
 
-#include <stdio.h>
-#include <stdlib.h>
+#include "DebugLogger.h"
+
 #include <string>
+#include <ostream>
 
-// *************************************************************************************************
-
-// Reads a file from the file system and exports its content to a buffer provided by the caller.
-// If the file is larger than a provide bugffer, it is delivered by chunks of the buffer size.
-// The last chunk may occupy less than the whole buffer. It's a caller's responsibility to allocate
-// the buffer and call the FileReader API untill the file is fully exported.
-
-class FileReader
+class OperationStatus
 {
 public:
 
-    explicit FileReader(const char* pFileName);
-    ~FileReader();
+    OperationStatus(bool success, const char* szMsg = NULL)
+        : m_Success(success)
+        , m_Msg(szMsg ? szMsg : "")
+    {
+    }
 
-    size_t ReadChunk(char* pBuf, size_t availableSpace);
+    OperationStatus(bool success, const std::string& msg)
+        : m_Success(success)
+        , m_Msg(msg)
+    {
+    }
 
-    bool IsCompleted() const { return m_ReadTillNow == m_FileSize; }
-    bool IsError() const { return m_IsError; }
-
-    size_t ReadTillNow() const { return m_ReadTillNow; }
-    size_t GetFileSize() const { return m_FileSize; }
+    bool IsSuccess() const { return m_Success; }
+    const std::string& GetMessage() const { return m_Msg; }
 
 private:
 
-    bool CanReadFromFile(char* pBuf, size_t availableSpace);
-
-    const std::string m_FileName;        // File name - cached for tracing
-    FILE* m_pFile;                       // File Handler - open for read
-    size_t m_FileSize;                   // File Size in bytes
-    size_t m_ReadTillNow;                // Bytes read till now
-    bool m_IsCompleted;                  // Set to true when OEF is reached
-    bool m_IsError;                      // Error flag
-
+    const bool m_Success;
+    const std::string m_Msg;
 };
 
+inline std::ostream& operator<<(std::ostream& os, const OperationStatus& st)
+{
+    return os << "Completed: " << SuccessStr(st.IsSuccess())
+              << " Message: [" << st.GetMessage() << ']';
+}
 
-#endif    // _FILE_READER_H_
+
+#endif  // _OPERATION_STATUS_H_

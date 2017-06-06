@@ -37,30 +37,36 @@
 
 // *************************************************************************************************
 /*
-    * The reply data may be generated in several ways, the data is expected to be obtained according to this type
-    */
+ * The reply data may be generated in several ways, the data is expected to be obtained according to this type
+ */
 enum REPLY_TYPE
 {
     REPLY_TYPE_NONE,
     REPLY_TYPE_BUFFER,
-    REPLY_TYPE_FILE
+    REPLY_TYPE_FILE,
+    REPLY_TYPE_WAIT_BINARY,
+    REPLY_TYPE_BINARY
 };
 
 // *************************************************************************************************
 /*
-    * A response to the client, through the servers
-    */
+ * A response to the client, through the servers
+ */
 typedef struct
 {
     std::string message;
     REPLY_TYPE type;
     unsigned int length;
+    uint8_t* binaryMessage;
+    vector<string> internalParsedMessage;
+    unsigned int inputBufSize;
 } ResponseMessage;
+
 
 // *************************************************************************************************
 /*
-    * ConnectionStatus indicates whether to close a connection with a client or not.
-    */
+ * ConnectionStatus indicates whether to close a connection with a client or not.
+ */
 enum ConnectionStatus
 {
     CLOSE_CONNECTION,
@@ -69,11 +75,11 @@ enum ConnectionStatus
 
 // **************************** Events Structures and Enum Types **************************************
 /*
-    * Define an event struct which would be sent as bytes in packed mode.
-    * The concept is to send the smallest message we can as it being sent many times and to multiple clients.
-    * NOTE that the __exactly__ same struct is defined in the side that gets this struct.
-    * The structures sent in packed mode (by using "#pragma pack(push, 1)")
-    */
+ * Define an event struct which would be sent as bytes in packed mode.
+ * The concept is to send the smallest message we can as it being sent many times and to multiple clients.
+ * NOTE that the __exactly__ same struct is defined in the side that gets this struct.
+ * The structures sent in packed mode (by using "#pragma pack(push, 1)")
+ */
 
 #pragma pack(push, 1) //following structures would be in packed mode
 

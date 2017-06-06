@@ -42,7 +42,7 @@ enum LogSeverity
     LOG_SEV_VERBOSE = 4    // Excessive debug
 };
 
-#define TRACE_WITH_PREFIX(SEV)    \
+#define TRACE_WITH_PREFIX(SEV)                                          \
     g_LogConfig.ShouldPrint(SEV) && std::cout << LogMsgPrefix(SEV, __FILE__, __LINE__)
 
 #define LOG_ERROR   TRACE_WITH_PREFIX(LOG_SEV_ERROR)
@@ -50,6 +50,18 @@ enum LogSeverity
 #define LOG_INFO    TRACE_WITH_PREFIX(LOG_SEV_INFO)
 #define LOG_DEBUG   TRACE_WITH_PREFIX(LOG_SEV_DEBUG)
 #define LOG_VERBOSE TRACE_WITH_PREFIX(LOG_SEV_VERBOSE)
+
+// Decoupling from system assert allows to print an error message when
+// assert is disabled.
+#define LOG_ASSERT(CONDITION)                                           \
+    do {                                                                \
+        if (!(CONDITION)) {                                             \
+            LOG_ERROR << "ASSERTION FAILURE: " << #CONDITION            \
+                << " at " << __FILE__ << ':' << __LINE__                \
+                << std::endl;                                           \
+                if (g_LogConfig.ShouldExitOnAssert()) exit(1);          \
+        }                                                               \
+    } while (false)
 
 // *************************************************************************************************
 
@@ -61,11 +73,13 @@ public:
 
     bool ShouldPrint(LogSeverity sev) const { return sev <= m_MaxSeverity; }
     bool ShouldPrintLocation() const { return m_PrintLocation; }
+    bool ShouldExitOnAssert() const { return m_ExitOnAssert; }
 
 private:
 
     LogSeverity m_MaxSeverity;
     const bool m_PrintLocation;
+    const bool m_ExitOnAssert;
 
 };
 
@@ -108,6 +122,20 @@ struct BoolStr
 inline std::ostream& operator<<(std::ostream& os, const BoolStr& boolStr)
 {
     return os << std::boolalpha << boolStr.Value << std::noboolalpha;
+}
+
+// *************************************************************************************************
+
+// Print a boolean value as a Success/Failure string
+struct SuccessStr
+{
+    explicit SuccessStr(bool value): Value(value) {}
+    const bool Value;
+};
+
+inline std::ostream& operator<<(std::ostream& os, const SuccessStr& successStr)
+{
+    return os << (successStr.Value ? "Success" : "Failure");
 }
 
 // *************************************************************************************************

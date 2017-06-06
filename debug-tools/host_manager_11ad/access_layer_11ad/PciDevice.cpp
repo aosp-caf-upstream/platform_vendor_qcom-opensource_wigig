@@ -108,6 +108,26 @@ bool PciDevice::WriteBlock(DWORD address, vector<DWORD> values)
     return (m_pDriverApi->WriteBlock(address, values.size() * 4, valuesToWrite));
 }
 
+bool PciDevice::AllocPmc(unsigned descSize, unsigned descNum, std::string& outMessage)
+{
+    return m_pDriverApi->AllocPmc(descSize, descNum, outMessage);
+}
+
+bool PciDevice::DeallocPmc(std::string& outMessage)
+{
+    return m_pDriverApi->DeallocPmc(outMessage);
+}
+
+bool PciDevice::CreatePmcFile(unsigned refNumber, std::string& outMessage)
+{
+    return m_pDriverApi->CreatePmcFile(refNumber, outMessage);
+}
+
+bool PciDevice::FindPmcFile(unsigned refNumber, std::string& outMessage)
+{
+    return m_pDriverApi->FindPmcFile(refNumber, outMessage);
+}
+
 bool PciDevice::Open()
 {
     return m_pDriverApi->Open();
@@ -129,6 +149,12 @@ int PciDevice::GetDriverMode(int &currentState)
 {
     return m_pDriverApi->GetDriverMode(currentState);
 }
+
+bool PciDevice::DriverControl(uint32_t Id, const void *inBuf, uint32_t inBufSize, void *outBuf, uint32_t outBufSize)
+{
+	return (m_pDriverApi->DriverControl(Id, inBuf, inBufSize, outBuf, outBufSize));
+}
+
 
 static string NameDevice(string interfaceName)
 {

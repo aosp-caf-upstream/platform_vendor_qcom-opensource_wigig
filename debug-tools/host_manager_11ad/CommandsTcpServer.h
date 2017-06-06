@@ -74,6 +74,7 @@ private:
     ConnectionStatus Reply(NetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage);
     ConnectionStatus ReplyBuffer(NetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage);
     ConnectionStatus ReplyFile(NetworkInterfaces::NetworkInterface &client, ResponseMessage &fileName);
+    ConnectionStatus ReplyBinary(NetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage);
 };
 
 

@@ -32,6 +32,8 @@
 #include "UdpTempOsAbstruction.h"
 #include <iostream>
 
+const string HostInfo::s_version = "1.1.1";
+
 HostInfo::HostInfo() :
     m_alias(""),
     m_persistencyPath(UdpTempOsAbstruction::GetPersistencyLocation() + "host_manager_11ad"),

@@ -55,6 +55,8 @@ public:
     static bool ConvertHexStringToDwordVector(string str, char delimiter, vector<DWORD>& values);
 
     static bool ConvertDecimalStringToUnsignedInt(string str, unsigned int& ui);
+
+    static bool ConvertStringToBool(string str, bool& boolVal);
 };
 
 #endif // !_UTILS_H_

@@ -39,7 +39,6 @@ public:
     //static void GetVersion(WLCT_DLL_VERSION *pVer);
     static set<string> GetDevices();
     static unique_ptr<Device> OpenDevice(string deviceName);
-    static void CloseDevice(string deviceName);
 
     static set<string> GetTestDevices();
 

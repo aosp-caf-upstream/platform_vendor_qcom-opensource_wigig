@@ -65,8 +65,9 @@ enum DeviceManagerOperationStatus
     dmosFailedToDeallocatePmc,
     dmosFailedToCreatePmcFile,
     dmosFailedToSendWmi,
-	dmosInvalidAddress,
-    dmosFail // general failure. try to avoid using it
+    dmosInvalidAddress,
+    dmosFail, // general failure. try to avoid using it
+    dmosSilentDevice
 };
 
 class DeviceManager
@@ -83,19 +84,26 @@ public:
     DeviceManagerOperationStatus WriteBlock(string deviceName, DWORD address, const vector<DWORD>& values);
     DeviceManagerOperationStatus InterfaceReset(string deviceName);
     DeviceManagerOperationStatus SwReset(string deviceName);
-    DeviceManagerOperationStatus AllocPmc(string deviceName, unsigned descSize, unsigned descNum);
-    DeviceManagerOperationStatus DeallocPmc(string deviceName);
-    DeviceManagerOperationStatus CreatePmcFile(string deviceName, unsigned refNumber);
+
+    DeviceManagerOperationStatus AllocPmc(string deviceName, unsigned descSize, unsigned descNum, std::string& errorMsg);
+    DeviceManagerOperationStatus DeallocPmc(string deviceName, std::string& outMessage);
+    DeviceManagerOperationStatus CreatePmcFile(string deviceName, unsigned refNumber, std::string& outMessage);
+    DeviceManagerOperationStatus FindPmcFile(string deviceName, unsigned refNumber, std::string& outMessage);
+
     DeviceManagerOperationStatus SendWmi(string deviceName, DWORD command, const vector<DWORD>& payload);
     DeviceManagerOperationStatus OpenInterface(string deviceName); // for backward compatibility
     DeviceManagerOperationStatus CloseInterface(string deviceName);
     DeviceManagerOperationStatus SetDriverMode(string deviceName, int newMode, int& oldMode);
+    DeviceManagerOperationStatus DriverControl(string deviceName, uint32_t Id, const void *inBuf, uint32_t inBufSize, void *outBuf, uint32_t outBufSize);
+    DeviceManagerOperationStatus GetDeviceSilentMode(string deviceName, bool& silentMode);
+    DeviceManagerOperationStatus SetDeviceSilentMode(string deviceName, bool silentMode);
 
 private:
     void PeriodicTasks();
     void UpdateConnectedDevices();
     void CreateDevice(string deviceName);
     void DeleteDevice(string deviceName);
+    bool IsDeviceSilent(string deviceName);
 
     unordered_map<string, shared_ptr<ConnectedDevice>> m_connectedDevices; // map from unique string (unique inside a host) to a connected device
     unsigned const m_deviceManagerRestDurationMs;

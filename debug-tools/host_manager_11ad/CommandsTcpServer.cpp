@@ -46,7 +46,7 @@ CommandsTcpServer::CommandsTcpServer(unsigned int commandsTcpPort, Host& host)
 
 void CommandsTcpServer::Start()
 {
-    LOG_INFO << "Starting commands TCP server on port " << m_port << endl;
+    //LOG_INFO << "Starting commands TCP server on port " << m_port << endl;
     m_pSocket->Bind(m_port);
     m_pSocket->Listen();
 
@@ -72,6 +72,7 @@ void CommandsTcpServer::Stop()
 {
     LOG_INFO << "Stopping the commands TCP server" << endl;
     m_pSocket->Shutdown(2); //type 2 -> Acts like the close(), shutting down both input and output
+    m_pSocket.reset();
 }
 
 // *************************************************************************************************
@@ -85,19 +86,19 @@ void CommandsTcpServer::ServerThread(NetworkInterfaces::NetworkInterface client)
 
     do
     {
-        string messages;
+        string concatenatedMessages;
 
         try
         {
-            const char* concatenatedMessages = client.Receive();
-            if (concatenatedMessages == NULL)
+            const char* message = client.Receive();
+            if (NULL == message)
             {
                 keepConnectionAliveFromReply = CLOSE_CONNECTION;
                 break;
             }
 
-            messages = concatenatedMessages;
-            vector<string> splitMessages = Utils::Split(messages, '\r');
+            concatenatedMessages = message;
+            vector<string> splitMessages = Utils::Split(concatenatedMessages, '\r');
 
             for (auto& message : splitMessages)
             {
@@ -106,9 +107,13 @@ void CommandsTcpServer::ServerThread(NetworkInterfaces::NetworkInterface client)
                 { //message back from the client is "", means the connection is closed
                     break;
                 }
-
                 //Try to execute the command from the client, get back from function if to keep the connection with the client alive or not
                 keepConnectionAliveFromCommand = pCommandsHandler->ExecuteCommand(message, referencedResponse);
+
+                if (referencedResponse.type == REPLY_TYPE_WAIT_BINARY) {
+                    uint8_t* binaryInput = (uint8_t*)client.BinaryReceive(referencedResponse.inputBufSize);
+                    keepConnectionAliveFromCommand = pCommandsHandler->ExecuteBinaryCommand(binaryInput, referencedResponse);
+                }
 
                 //Reply back to the client an answer for his command. If it wasn't successful - close the connection
                 keepConnectionAliveFromReply = CommandsTcpServer::Reply(client, referencedResponse);
@@ -142,11 +147,12 @@ ConnectionStatus CommandsTcpServer::Reply(NetworkInterfaces::NetworkInterface &c
         return ReplyBuffer(client, responseMessage);
     case REPLY_TYPE_FILE:
         return ReplyFile(client, responseMessage);
+    case REPLY_TYPE_BINARY:
+        return ReplyBinary(client, responseMessage);
     default:
-        //LOG_ERROR << "Unknown reply type" << endl;
-        break;
+        LOG_ERROR << "Unknown reply type" << endl;
+        return CLOSE_CONNECTION;
     }
-    return CLOSE_CONNECTION;
 }
 
 
@@ -162,21 +168,12 @@ ConnectionStatus CommandsTcpServer::ReplyBuffer(NetworkInterfaces::NetworkInterf
         return CLOSE_CONNECTION;
     }
 
-    try
+    //TODO - maybe the sending format is ending with "\r\n"
+    if (!client.SendString(responseMessage.message + "\r"))
     {
-        client.Send((responseMessage.message + "\r").c_str()); //TODO - maybe the sending format is ending with "\n\r"
-    }
-    catch (const exception& e)
-    {
-        LOG_ERROR << "couldn't send the message to the client, closing connection: " << e.what() << endl;
+        LOG_ERROR << "Couldn't send the message to the client, closing connection" << endl;
         return CLOSE_CONNECTION;
     }
-    catch (int e) // TODO: check if we can remove the previous catch
-    {
-        LOG_ERROR << "couldn't send the message to the client, closing connection: " << e << endl;
-        return CLOSE_CONNECTION;
-    }
-
 
     return KEEP_CONNECTION_ALIVE;
 }
@@ -185,11 +182,12 @@ ConnectionStatus CommandsTcpServer::ReplyBuffer(NetworkInterfaces::NetworkInterf
 //TODO - reply file had been copied from old "wilserver" almost without touching it.
 //It has to be checked and also modified to fit the new "host_server_11ad"
 //The same applies to "FileReader.h" and "FileReader.cpp"
-ConnectionStatus CommandsTcpServer::ReplyFile(NetworkInterfaces::NetworkInterface & client, ResponseMessage & fileName)
+ConnectionStatus CommandsTcpServer::ReplyFile(NetworkInterfaces::NetworkInterface& client, ResponseMessage& fileName)
 {
-    LOG_DEBUG << "Replying from a file: " << fileName.message << std::endl;
     FileReader fileReader(fileName.message.c_str());
     size_t fileSize = fileReader.GetFileSize();
+    LOG_DEBUG << "Replying from a file: " << fileName.message
+              << " Size: " << fileSize << " B" << std::endl;
 
     if (0 == fileSize)
     {
@@ -197,55 +195,63 @@ ConnectionStatus CommandsTcpServer::ReplyFile(NetworkInterfaces::NetworkInterfac
         return CLOSE_CONNECTION;
     }
 
-    static const size_t BUF_LEN = 64 * 1024;
+    static const size_t SEND_BUFFER_LEN = 1024 * 1024;
+    std::unique_ptr<char[]> spSendBuffer(new char[SEND_BUFFER_LEN]);
+    if (!spSendBuffer)
+    {
+        LOG_ERROR << "Cannot allocate send buffer of " << SEND_BUFFER_LEN << " B";
+        return CLOSE_CONNECTION;
+    }
 
-    char* pBuf = new char[BUF_LEN];
     size_t chunkSize = 0;
-    bool isError = false;
-
     do
     {
-        LOG_VERBOSE << "Requesting for a file chunk" << std::endl;
+        LOG_VERBOSE << "Requesting for a file chunk of " << SEND_BUFFER_LEN << " B"  << std::endl;
 
-        chunkSize = fileReader.ReadChunk(pBuf, BUF_LEN);
+        chunkSize = fileReader.ReadChunk(spSendBuffer.get(), SEND_BUFFER_LEN);
         if (chunkSize > 0)
         {
-            //if (false == send_buffer(sock, pBuf, chunkSize)) //TODO - was in the old "wilserver" changed to the next line (with client.send(pBuf))
-            if (0 == client.Send(pBuf))
+            LOG_ASSERT(chunkSize <= SEND_BUFFER_LEN);
+            if (!client.SendBuffer(spSendBuffer.get(), chunkSize))
             {
-                LOG_ERROR << "Send error detected" << std::endl;
-                isError = true;
-                break;
+                LOG_ERROR << "Error occurred while replying file content - transport error" << std::endl;
+                return CLOSE_CONNECTION;
             }
         }
 
         // Error/Completion may occur with non-zero chunk as well
         if (fileReader.IsError())
         {
-            LOG_ERROR << "File read error detected" << std::endl;
-            isError = true;
-            break;
+            LOG_ERROR << "Cannot send reply - file read error" << std::endl;
+            return CLOSE_CONNECTION;
         }
 
         if (fileReader.IsCompleted())
         {
-            LOG_DEBUG << "File completion detected" << std::endl;
-            break;
+            LOG_DEBUG << "File Content successfully delivered" << std::endl;
+            return KEEP_CONNECTION_ALIVE;
         }
 
         LOG_DEBUG << "File Chunk Delivered: " << chunkSize << "B" << std::endl;
-    } while (chunkSize > 0);
+    }
+    while (chunkSize > 0);
 
-    delete[] pBuf;
+    return KEEP_CONNECTION_ALIVE;
+}
 
-    if (isError)
+ConnectionStatus CommandsTcpServer::ReplyBinary(NetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage)
+{
+    if (0 == responseMessage.length)
     {
-        LOG_ERROR << "Error occurred while replying file content" << std::endl;
+        LOG_ERROR << "No reply generated by a command handler - connection will be closed" << endl;
         return CLOSE_CONNECTION;
     }
-    else
+
+    if (!client.SendBuffer((const char*)responseMessage.binaryMessage, responseMessage.length))
     {
-        LOG_DEBUG << "File Content successfully delivered" << std::endl;
-        return KEEP_CONNECTION_ALIVE;
+        LOG_ERROR << "Couldn't send the message to the client, closing connection" << endl;
+        return CLOSE_CONNECTION;
     }
+
+    return KEEP_CONNECTION_ALIVE;
 }

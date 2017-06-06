@@ -48,6 +48,7 @@ void Host::StartHost(unsigned int commandsTcpPort, unsigned int eventsTcpPort, u
     thread threadCommandsTcpServer;
     try
     {
+        LOG_INFO << "Starting commands TCP server on port " << commandsTcpPort << endl;
         //threadCommandsTcpServer = thread(&CommandsTcpServer::Start, m_pCommandsTcpServer);
         threadCommandsTcpServer = thread(&CommandsTcpServer::Start, m_pCommandsTcpServer.get());
     }
@@ -68,6 +69,7 @@ void Host::StartHost(unsigned int commandsTcpPort, unsigned int eventsTcpPort, u
     thread threadEventsTcpServer;
     try
     {
+        LOG_INFO << "Starting events TCP server on port " << eventsTcpPort << endl;
         //threadEventsTcpServer = thread(&EventsTcpServer::Start, m_pEventsTcpServer);
         threadEventsTcpServer = thread(&EventsTcpServer::Start, m_pEventsTcpServer.get());
     }
@@ -76,8 +78,6 @@ void Host::StartHost(unsigned int commandsTcpPort, unsigned int eventsTcpPort, u
         LOG_ERROR << "Couldn't start events TCP server" << endl;
         throw "Couldn't start commands TCP server";
     }
-
-    LOG_INFO << "Starting UDP server at port in: " << udpPortIn << ", and port out: " << udpPortOut << endl;
 
     m_pUdpServer.reset(new UdpServer(udpPortIn, udpPortOut, *this));
     if (!m_pUdpServer)
@@ -89,6 +89,7 @@ void Host::StartHost(unsigned int commandsTcpPort, unsigned int eventsTcpPort, u
     thread threadUdpServer;
     try
     {
+        LOG_INFO << "Starting UDP server at port in: " << udpPortIn << ", and port out: " << udpPortOut << endl;
         threadUdpServer = thread(&UdpServer::StartServer, m_pUdpServer);
     }
     catch (exception e)

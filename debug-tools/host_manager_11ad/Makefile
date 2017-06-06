@@ -18,8 +18,10 @@ CXX := $(CROSS)g++
 .DEFAULT_GOAL = all
 PROG = host_manager_11ad
 
-INCLUDE_CFLAGS += -I access_layer_11ad \
-                  -I access_layer_11ad/Unix \
+INCLUDE_CFLAGS += \
+	-I .\
+	-I access_layer_11ad \
+	-I access_layer_11ad/Unix \
 
 all: $(PROG)
 
@@ -34,6 +36,6 @@ $(PROG): $(OBJ_FILES) $(LIBS)
 
 clean:
 	rm -rf $(PROG)
-	find . -type f \( -name "*.d" -o -name "*.o" \) -delete
+	find . -type f \( -name "*.d" -o -name "*.o" -o -name "*~" \) -delete
 
 -include $(OBJ_FILES:%.o=%.d)

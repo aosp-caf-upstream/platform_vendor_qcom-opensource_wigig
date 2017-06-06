@@ -32,7 +32,7 @@
 #include "AccessLayerAPI.h"
 
 #ifdef _WINDOWS
-//#include "JTagDevice.h"
+#include "JTagDevice.h"
 #include "SerialDevice.h"
 #endif
 #include "TestDevice.h"
@@ -50,7 +50,9 @@ set<string> AccessLayer::GetDevices()
     set<string> pciDevices = PciDevice::Enumerate();
 
 #ifdef _WINDOWS
-    //set<string> jtagDevices = JTagDevice::Enumerate();
+    set<string> jtagDevices = JTagDevice::Enumerate();
+    enumeratedDevices.insert(jtagDevices.begin(), jtagDevices.end());
+
     //set<string> serialDevices = SerialDevice::Enumerate();
     //enumeratedDevices.insert(serialDevices.begin(), serialDevices.end());
 #endif
@@ -87,6 +89,11 @@ unique_ptr<Device> AccessLayer::OpenDevice(string deviceName)
     }
 
 #ifdef _WINDOWS
+    if ("JTAG" == tokens[0])
+    {
+        pDevice.reset(new JTagDevice(deviceName, tokens[1]));
+    }
+
     if ("SERIAL" == tokens[0])
     {
         pDevice.reset(new SerialDevice(deviceName, tokens[1]));
@@ -102,10 +109,4 @@ unique_ptr<Device> AccessLayer::OpenDevice(string deviceName)
 
 
     return pDevice;
-}
-
-void AccessLayer::CloseDevice(string deviceName)
-{
-    //do something with params
-    (void)deviceName;
 }

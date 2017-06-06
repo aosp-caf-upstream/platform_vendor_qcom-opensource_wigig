@@ -97,10 +97,16 @@ public:
     bool Open();
     bool ReOpen();
     bool InternalOpen();
-    bool Ioctl(uint32_t Id,
+    bool DriverControl(uint32_t Id,
         const void *inBuf, uint32_t inBufSize,
         void *outBuf, uint32_t outBufSize);
     DWORD DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DWORD DebugFSFlags);
+
+    bool AllocPmc(unsigned descSize, unsigned descNum, std::string& outMessage);
+    bool DeallocPmc(std::string& outMessage);
+    bool CreatePmcFile(unsigned refNumber, std::string& outMessage);
+    bool FindPmcFile(unsigned refNumber, std::string& outMessage);
+
     void Close();
 
     int GetDriverMode(int &currentState);

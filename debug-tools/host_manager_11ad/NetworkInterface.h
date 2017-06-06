@@ -69,6 +69,7 @@ namespace NetworkInterfaces
         struct sockaddr_in m_localAddress;
         char* m_buffer;
         int m_bufferSize;
+        std::string m_peerName;
 
     public:
 
@@ -81,9 +82,12 @@ namespace NetworkInterfaces
         NetworkInterface Accept();
 
         // Send and Receive
-        int Send(const char* data);
-        int Send(const std::string& data);
+        bool SendString(const std::string& text);
+        bool SendString(const char* szText);
+        bool SendBuffer(const char* pBuf, size_t bufSize);
+
         const char* Receive(int size = 1024, int flags = 0);
+        const char* BinaryReceive(int size, int flags = 0);
 
         // Terminate Connection
         void Close();
@@ -91,6 +95,7 @@ namespace NetworkInterfaces
 
         // Addresses
         const char* GetPeerName() const;
+        void UpdatePeerNameInternal();
     };
 
 }

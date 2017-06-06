@@ -48,18 +48,18 @@ class CommandsHandler
 {
 public:
     /*
-    * pCommandFunction is used for the functions map - each function gets two arguments:
-    * vector of strings which holds the arguments and the number of arguments in that vector
-    */
+     * pCommandFunction is used for the functions map - each function gets two arguments:
+     * vector of strings which holds the arguments and the number of arguments in that vector
+     */
     typedef ResponseMessage(CommandsHandler::*pCommandFunction)(vector<string>, unsigned int);
 
     /*
-    * The constructor inserts each one of the available functions into the map - m_functionHandler - according to server type (TCP/UDP)
-    */
+     * The constructor inserts each one of the available functions into the map - m_functionHandler - according to server type (TCP/UDP)
+     */
     CommandsHandler(ServerType type, Host& host);
 
     ConnectionStatus ExecuteCommand(string message, ResponseMessage &referencedResponse);
-
+    ConnectionStatus ExecuteBinaryCommand(uint8_t* binaryInput, ResponseMessage &referencedResponse);
 
 private:
     shared_ptr<MessageParser> m_pMessageParser;
@@ -73,6 +73,7 @@ private:
         chrsInvalidArgument,
         chrsOperationFailure,
         chrsLinuxSupportOnly,
+        chrsDeviceIsSilent,
         chrsSuccess
     };
 
@@ -83,24 +84,27 @@ private:
         case chrsInvalidNumberOfArguments:
             return "Invalid arguments number";
         case chrsInvalidArgument:
-            return "Invaild argument type";
+            return "Invalid argument type";
         case chrsOperationFailure:
             return "Operation failure";
         case chrsLinuxSupportOnly:
             return "Linux support only";
         case chrsSuccess:
             return "Success";
+        case chrsDeviceIsSilent:
+            return "SilentDevice";
+
         default:
             return "CommandsHandlerResponseStatus is unknown";
         }
     }
 
     /*
-    FormatResponseMessage
-    Decorate the response message with time stamp and a success status
-    @param: successStatus - true for a successful operation, false otherwise
-    @param: message - the content of the response
-    @return: the decorated response
+      FormatResponseMessage
+      Decorate the response message with time stamp and a success status
+      @param: successStatus - true for a successful operation, false otherwise
+      @param: message - the content of the response
+      @return: the decorated response
     */
     string DecorateResponseMessage(bool successStatus, string message = "");
 
@@ -129,14 +133,23 @@ private:
 
     ResponseMessage CreatePmcFile(vector<string> arguments, unsigned int numberOfArguments);
 
-    ResponseMessage ReadPmcFile(vector<string> arguments, unsigned int numberOfArguments);
+    ResponseMessage FindPmcFile(vector<string> arguments, unsigned int numberOfArguments);
 
     ResponseMessage SendWmi(vector<string> arguments, unsigned int numberOfArguments);
 
     ResponseMessage GetTime(vector<string> arguments, unsigned int numberOfArguments);
 
-	ResponseMessage SetDriverMode(vector<string> arguments, unsigned int numberOfArguments);
+    ResponseMessage SetDriverMode(vector<string> arguments, unsigned int numberOfArguments);
 
+    ResponseMessage GetHostManagerVersion(vector<string> arguments, unsigned int numberOfArguments);
+
+    ResponseMessage DriverControl(vector<string> arguments, unsigned int numberOfArguments);
+
+    ResponseMessage GenericDriverIO(vector<string> arguments, void* inputBuf, unsigned int inputBufSize);
+
+    ResponseMessage GetDeviceSilenceMode(vector<string> arguments, unsigned int numberOfArguments);
+
+    ResponseMessage SetDeviceSilenceMode(vector<string> arguments, unsigned int numberOfArguments);
 
     bool ValidArgumentsNumber(string functionName, size_t numberOfArguments, size_t expectedNumOfArguments, string& responseMessage)
     {
@@ -151,18 +164,18 @@ private:
     }
 
     /*
-    GetHostNetworkInfo
-    Return host's IP and host's alias as the Response
-    @param: an empty vector
-    @return: a response with a string that contains both  host's IP and host's alias
+      GetHostNetworkInfo
+      Return host's IP and host's alias as the Response
+      @param: an empty vector
+      @return: a response with a string that contains both  host's IP and host's alias
     */
     ResponseMessage GetHostNetworkInfo(vector<string> arguments, unsigned int numberOfArguments);
 
     /*
-    SetHostAlias
-    Get a new alias and define it as the new host's alias
-    @param: a vector with one string representing the new alias
-    @return: a response with feedback about the operation status (success/failure)
+      SetHostAlias
+      Get a new alias and define it as the new host's alias
+      @param: a vector with one string representing the new alias
+      @return: a response with feedback about the operation status (success/failure)
     */
     ResponseMessage SetHostAlias(vector<string> arguments, unsigned int numberOfArguments);
 

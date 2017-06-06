@@ -29,11 +29,11 @@
 
 #include "CommandsHandler.h"
 #include "Host.h"
+#include "HostDefinitions.h"
+#include "FileReader.h"
+
 #include <sstream>
 #include <string>
-#include "HostDefinitions.h"
-#include "pmc_file.h"
-#include "FileReader.h"
 
 string CommandsHandler::DecorateResponseMessage(bool successStatus, string message)
 {
@@ -61,7 +61,7 @@ ResponseMessage CommandsHandler::GetInterfaces(vector<string> arguments, unsigne
 
         if (dmosSuccess != status)
         {
-            LOG_ERROR << "Error while trying to get interfaces. Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status);
+            LOG_ERROR << "Error while trying to get interfaces. Error: " << m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status) << endl;
             response.message = (dmosNoSuchConnectedDevice == status)? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
                 DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
         }
@@ -81,7 +81,6 @@ ResponseMessage CommandsHandler::GetInterfaces(vector<string> arguments, unsigne
                 }
                 devicesSs << m_device_delimiter << *it;
             }
-
             response.message = DecorateResponseMessage(true, devicesSs.str());
         }
     }
@@ -101,7 +100,7 @@ ResponseMessage CommandsHandler::OpenInterface(vector<string> arguments, unsigne
 
         if (dmosSuccess != status)
         {
-            LOG_ERROR << "Error while trying to open interface " + arguments[0] + ". Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status);
+            LOG_ERROR << "Error while trying to open interface " << arguments[0] + ". Error: " << m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status) << endl;
             response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
                 DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
         }
@@ -126,7 +125,7 @@ ResponseMessage CommandsHandler::CloseInterface(vector<string> arguments, unsign
 
         if (dmosSuccess != status)
         {
-            LOG_ERROR << "Error while trying to close interface " + arguments[0] + ". Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status);
+            LOG_ERROR << "Error while trying to close interface " << arguments[0] << ". Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status) << endl;
             response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
                 DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
         }
@@ -159,9 +158,17 @@ ResponseMessage CommandsHandler::Read(vector<string> arguments, unsigned int num
             DeviceManagerOperationStatus status = m_host.GetDeviceManager().Read(arguments[0], address, value);
             if (dmosSuccess != status)
             {
-                LOG_ERROR << "Error while trying to read address " + arguments[1] + " from " + arguments[0] + ". Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status);
-                response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
-                    DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+                if (dmosSilentDevice == status)
+                {
+                    response.message = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsDeviceIsSilent));
+                }
+                else
+                {
+                    LOG_ERROR << "Error while trying to read address " << arguments[1] << " from " + arguments[0] << ". Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status) << endl;
+                    response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
+                        DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+
+                }
             }
             else
             {
@@ -193,9 +200,19 @@ ResponseMessage CommandsHandler::Write(vector<string> arguments, unsigned int nu
             DeviceManagerOperationStatus status = m_host.GetDeviceManager().Write(arguments[0], address, value);
             if (dmosSuccess != status)
             {
-                LOG_ERROR << "Error while trying to write value " + arguments[2] +" to " + arguments[1] + " on " + arguments[0] + ". Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status);
-                response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
-                    DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+                if (dmosSilentDevice == status)
+                {
+                    response.message = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsDeviceIsSilent));
+                }
+                else
+                {
+                    LOG_ERROR << "Error while trying to write value " << arguments[2] << " to " << arguments[1] + " on "
+                              << arguments[0] + ". Error: "
+                              << m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status) << endl;
+                    response.message = (dmosNoSuchConnectedDevice == status) ?
+                        DecorateResponseMessage(false,m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
+                        DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+                }
             }
             else
             {
@@ -226,9 +243,19 @@ ResponseMessage CommandsHandler::ReadBlock(vector<string> arguments, unsigned in
             DeviceManagerOperationStatus status = m_host.GetDeviceManager().ReadBlock(arguments[0], address, blockSize, values);
             if (dmosSuccess != status)
             {
-                LOG_ERROR << "Error while trying to read " + arguments[2] + " addresses starting at address " + arguments[1] + " from " + arguments[0] + ". Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status);
-                response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
-                    DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+                if (dmosSilentDevice == status)
+                {
+                    response.message = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsDeviceIsSilent));
+                }
+                else
+                {
+                    LOG_ERROR << "Error while trying to read " << arguments[2] << " addresses starting at address "
+                              << arguments[1] << " from " << arguments[0] << ". Error: "
+                              << m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status) << endl;
+                    response.message = (dmosNoSuchConnectedDevice == status) ?
+                        DecorateResponseMessage(false,m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
+                        DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+                }
             }
             else
             {
@@ -272,10 +299,19 @@ ResponseMessage CommandsHandler::WriteBlock(vector<string> arguments, unsigned i
             DeviceManagerOperationStatus status = m_host.GetDeviceManager().WriteBlock(arguments[0], address, values);
             if (dmosSuccess != status)
             {
-                LOG_ERROR << "Error in write blocks. arguments are:\nDevice name - " + arguments[0] + "\nStart address - " + arguments[1] +
-                    "\nValues - " + arguments[2];
-                response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
-                    DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+                if (dmosSilentDevice == status)
+                {
+                    response.message = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsDeviceIsSilent));
+                }
+                else
+                {
+                    LOG_ERROR << "Error in write blocks. arguments are:\nDevice name - " << arguments[0]
+                              << "\nStart address - " << arguments[1] <<
+                        "\nValues - " << arguments[2] << endl;
+                    response.message = (dmosNoSuchConnectedDevice == status) ?
+                        DecorateResponseMessage(false,m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)):
+                        DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+                }
             }
             else
             {
@@ -298,7 +334,7 @@ ResponseMessage CommandsHandler::InterfaceReset(vector<string> arguments, unsign
         DeviceManagerOperationStatus status = m_host.GetDeviceManager().InterfaceReset(arguments[0]);
         if (dmosSuccess != status)
         {
-            LOG_ERROR << "Failed to perform interface reset on " + arguments[0] + ". Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status);
+            LOG_ERROR << "Failed to perform interface reset on " << arguments[0] << ". Error: " << m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status) << endl;
             response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
                 DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
         }
@@ -322,7 +358,7 @@ ResponseMessage CommandsHandler::SwReset(vector<string> arguments, unsigned int 
         DeviceManagerOperationStatus status = m_host.GetDeviceManager().SwReset(arguments[0]);
         if (dmosSuccess != status)
         {
-            LOG_ERROR << "Failed to perform sw reset on " + arguments[0] + ". Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status);
+            LOG_ERROR << "Failed to perform sw reset on " << arguments[0] << ". Error: " << m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status) << endl;
             response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
                 DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
         }
@@ -335,38 +371,41 @@ ResponseMessage CommandsHandler::SwReset(vector<string> arguments, unsigned int 
     response.length = response.message.size();
     return response;
 }
+
 // *************************************************************************************************
 
 ResponseMessage CommandsHandler::AllocPmc(vector<string> arguments, unsigned int numberOfArguments)
 {
     //do something with params
     (void)numberOfArguments;
-    LOG_VERBOSE << __FUNCTION__;
+    LOG_VERBOSE << __FUNCTION__ << endl;
+    stringstream ss;
     for (auto& s : arguments)
     {
-        LOG_VERBOSE << "," << s;
+        ss << "," << s;
     }
-    LOG_VERBOSE << endl;
+    LOG_VERBOSE << ss.str() << endl;
 
     ResponseMessage response;
     if (ValidArgumentsNumber(__FUNCTION__, arguments.size(), 3, response.message))
     {
         unsigned descSize;
         unsigned descNum;
-        if (!Utils::ConvertDecimalStringToUnsignedInt(arguments[1], descSize) || !Utils::ConvertDecimalStringToUnsignedInt(arguments[2], descNum))
+        if (!Utils::ConvertDecimalStringToUnsignedInt(arguments[1], descSize) ||
+            !Utils::ConvertDecimalStringToUnsignedInt(arguments[2], descNum))
         {
             stringstream error;
             response.message = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsInvalidArgument));
         }
         else
         {
-            DeviceManagerOperationStatus status = m_host.GetDeviceManager().AllocPmc(arguments[0], descSize, descNum);
+            std::string errorMsg;
+            DeviceManagerOperationStatus status = m_host.GetDeviceManager().AllocPmc(arguments[0], descSize, descNum, errorMsg);
             if (dmosSuccess != status)
             {
                 stringstream error;
-                LOG_ERROR << __FUNCTION__ << ":" << m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status);
-                response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
-                    DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+                LOG_ERROR << "PMC allocation Failed: " << errorMsg << std::endl;
+                response.message = DecorateResponseMessage(false, errorMsg);
             }
             else
             {
@@ -374,33 +413,36 @@ ResponseMessage CommandsHandler::AllocPmc(vector<string> arguments, unsigned int
             }
         }
     }
+
     response.type = REPLY_TYPE_BUFFER;
     response.length = response.message.size();
     return response;
 }
+
 // *************************************************************************************************
 
 ResponseMessage CommandsHandler::DeallocPmc(vector<string> arguments, unsigned int numberOfArguments)
 {
     //do something with params
     (void)numberOfArguments;
-    LOG_VERBOSE << __FUNCTION__;
+    LOG_VERBOSE << __FUNCTION__ << endl;
+    stringstream ss;
     for (auto& s : arguments)
     {
-        LOG_VERBOSE << "," << s;
+        ss << "," << s;
     }
-    LOG_VERBOSE << endl;
+    LOG_VERBOSE << ss.str() << endl;
 
     ResponseMessage response;
     if (ValidArgumentsNumber(__FUNCTION__, arguments.size(), 1, response.message))
     {
-        DeviceManagerOperationStatus status = m_host.GetDeviceManager().DeallocPmc(arguments[0]);
+        std::string errorMsg;
+        DeviceManagerOperationStatus status = m_host.GetDeviceManager().DeallocPmc(arguments[0], errorMsg);
         if (dmosSuccess != status)
         {
             stringstream error;
-            LOG_ERROR << __FUNCTION__ << ":" << m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status);
-            response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
-                DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+            LOG_ERROR << "PMC de-allocation Failed: " << errorMsg << std::endl;
+            response.message = DecorateResponseMessage(false, errorMsg);
         }
         else
         {
@@ -411,18 +453,20 @@ ResponseMessage CommandsHandler::DeallocPmc(vector<string> arguments, unsigned i
     response.length = response.message.size();
     return response;
 }
+
 // *************************************************************************************************
 
 ResponseMessage CommandsHandler::CreatePmcFile(vector<string> arguments, unsigned int numberOfArguments)
 {
     //do something with params
     (void)numberOfArguments;
-    LOG_VERBOSE << __FUNCTION__;
+    LOG_VERBOSE << __FUNCTION__ << endl;
+    stringstream ss;
     for (auto& s : arguments)
     {
-        LOG_VERBOSE << "," << s;
+        ss << "," << s;
     }
-    LOG_VERBOSE << endl;
+    LOG_VERBOSE << ss.str() << endl;
 
     ResponseMessage response;
     if (ValidArgumentsNumber(__FUNCTION__, arguments.size(), 2, response.message))
@@ -434,17 +478,17 @@ ResponseMessage CommandsHandler::CreatePmcFile(vector<string> arguments, unsigne
         }
         else
         {
-            DeviceManagerOperationStatus status = m_host.GetDeviceManager().CreatePmcFile(arguments[0], refNumber);
+            std::string outMsg;
+            DeviceManagerOperationStatus status = m_host.GetDeviceManager().CreatePmcFile(arguments[0], refNumber, outMsg);
             if (dmosSuccess != status)
             {
                 stringstream error;
-                LOG_ERROR << __FUNCTION__ << ":" << m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status);
-                response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
-                    DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+                LOG_ERROR << "PMC data file creation failed: " << outMsg << std::endl;
+                response.message = DecorateResponseMessage(false, outMsg);
             }
             else
             {
-                response.message = DecorateResponseMessage(true);
+                response.message = DecorateResponseMessage(true, outMsg);
             }
         }
     }
@@ -454,16 +498,17 @@ ResponseMessage CommandsHandler::CreatePmcFile(vector<string> arguments, unsigne
 }
 // *************************************************************************************************
 
-ResponseMessage CommandsHandler::ReadPmcFile(vector<string> arguments, unsigned int numberOfArguments)
+ResponseMessage CommandsHandler::FindPmcFile(vector<string> arguments, unsigned int numberOfArguments)
 {
     //do something with params
     (void)numberOfArguments;
-    LOG_VERBOSE << __FUNCTION__;
+    LOG_VERBOSE << __FUNCTION__ << endl;
+    stringstream ss;
     for (auto& s : arguments)
     {
-        LOG_VERBOSE << "," << s;
+        ss << "," << s;
     }
-    LOG_VERBOSE << endl;
+    LOG_VERBOSE << ss.str() << endl;
 
     ResponseMessage response;
     response.type = REPLY_TYPE_BUFFER;
@@ -471,26 +516,26 @@ ResponseMessage CommandsHandler::ReadPmcFile(vector<string> arguments, unsigned 
 #ifdef _WINDOWS
     response.message = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsLinuxSupportOnly));
 #else
-    if (ValidArgumentsNumber(__FUNCTION__, arguments.size(), 1, response.message))
+    if (ValidArgumentsNumber(__FUNCTION__, arguments.size(), 2, response.message))
     {
         unsigned refNumber;
-        if (!Utils::ConvertDecimalStringToUnsignedInt(arguments[0], refNumber))
+        if (!Utils::ConvertDecimalStringToUnsignedInt(arguments[1], refNumber))
         {
             response.message = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsInvalidArgument));
         }
         else
         {
-            LOG_DEBUG << "Reading PMC File #" << refNumber << endl;
-            PmcFile pmcFile(refNumber);
-
-            if (NULL == pmcFile.GetFileName())
+            std::string outMessage;
+            DeviceManagerOperationStatus status = m_host.GetDeviceManager().FindPmcFile(arguments[0], refNumber, outMessage);
+            if (dmosSuccess != status)
             {
-                response.message = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+                stringstream error;
+                LOG_ERROR << "PMC data file lookup failed: " << outMessage << std::endl;
+                response.message = DecorateResponseMessage(false, outMessage);
             }
             else
             {
-                // Note: Nthe file name won't be sent to a clientls
-                response.message = pmcFile.GetFileName();
+                response.message = outMessage;
                 response.type = REPLY_TYPE_FILE;
             }
         }
@@ -505,12 +550,13 @@ ResponseMessage CommandsHandler::SendWmi(vector<string> arguments, unsigned int 
 {
     //do something with params
     (void)numberOfArguments;
-    LOG_VERBOSE << __FUNCTION__;
+    LOG_VERBOSE << __FUNCTION__ << endl;
+    stringstream ss;
     for (auto& s : arguments)
     {
-        LOG_VERBOSE << "," << s;
+        ss << "," << s;
     }
-    LOG_VERBOSE << endl;
+    LOG_VERBOSE << ss.str() << endl;
 
     ResponseMessage response;
     if (ValidArgumentsNumber(__FUNCTION__, arguments.size(), 3, response.message))
@@ -524,9 +570,16 @@ ResponseMessage CommandsHandler::SendWmi(vector<string> arguments, unsigned int 
         DeviceManagerOperationStatus status = m_host.GetDeviceManager().SendWmi(arguments[0], command, payload);
         if (dmosSuccess != status)
         {
-            LOG_ERROR << __FUNCTION__ << ":" << m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status);
-            response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
-                DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+            if (dmosSilentDevice == status)
+            {
+                response.message = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsDeviceIsSilent));
+            }
+            else
+            {
+                LOG_ERROR << __FUNCTION__ << ":" << m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status) << endl;
+                response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
+                    DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+            }
         }
         else
         {
@@ -620,7 +673,7 @@ ResponseMessage CommandsHandler::SetDriverMode(vector<string> arguments, unsigne
         DeviceManagerOperationStatus status = m_host.GetDeviceManager().SetDriverMode(arguments[0], newMode, oldMode);
         if (dmosSuccess != status)
         {
-            LOG_ERROR << "Failed to set driver mode on " + arguments[0] + ". Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status);
+            LOG_ERROR << "Failed to set driver mode on " << arguments[0] << ". Error: " << m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status) << endl;
             response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
                 DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
         }
@@ -650,6 +703,149 @@ ResponseMessage CommandsHandler::SetDriverMode(vector<string> arguments, unsigne
             }
 
             response.message = DecorateResponseMessage(true, message);
+        }
+    }
+    response.type = REPLY_TYPE_BUFFER;
+    response.length = response.message.size();
+    return response;
+}
+// *************************************************************************************************
+
+ResponseMessage CommandsHandler::GetHostManagerVersion(vector<string> arguments, unsigned int numberOfArguments)
+{
+    //do something with params
+    (void)arguments;
+    LOG_VERBOSE << __FUNCTION__ << endl;
+    ResponseMessage response;
+
+    if (ValidArgumentsNumber(__FUNCTION__, numberOfArguments, 0, response.message))
+    {
+        string res = m_host.GetHostInfo().GetVersion();
+        response.message = DecorateResponseMessage(true, res);
+    }
+    response.type = REPLY_TYPE_BUFFER;
+    response.length = response.message.size();
+    return response;
+}
+// *************************************************************************************************
+
+// *************************************************************************************************
+ResponseMessage CommandsHandler::DriverControl(vector<string> arguments, unsigned int numberOfArguments)
+{
+    //cout << __FUNCTION__ << endl;
+    ResponseMessage response;
+    if (ValidArgumentsNumber(__FUNCTION__, numberOfArguments, 4, response.message))
+    {
+        DWORD inBufSize;
+        //vector<DWORD> inputValues;
+        if (!Utils::ConvertHexStringToDword(arguments[2], inBufSize))
+        {
+            response.message = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsInvalidArgument));
+        }
+        response.inputBufSize = inBufSize;
+    }
+    response.internalParsedMessage = arguments;
+    response.type = REPLY_TYPE_WAIT_BINARY;
+    return response;
+}
+// *************************************************************************************************
+
+// *************************************************************************************************
+ResponseMessage CommandsHandler::GenericDriverIO(vector<string> arguments, void* inputBuf, unsigned int inputBufSize)
+{
+    //cout << __FUNCTION__ << endl;
+    ResponseMessage response;
+    DWORD id, inBufSize, outBufSize;
+    //vector<DWORD> inputValues;
+    if (!Utils::ConvertHexStringToDword(arguments[1], id) || !Utils::ConvertHexStringToDword(arguments[2], inBufSize) || !Utils::ConvertHexStringToDword(arguments[3], outBufSize))
+    {
+        response.message = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsInvalidArgument));
+    }
+
+    else {
+        DeviceManagerOperationStatus status;
+
+        uint8_t* outputBuf = new uint8_t[outBufSize];
+        memset(outputBuf, 0, outBufSize);
+
+        cout << "Reading from device" << endl;
+        status = m_host.GetDeviceManager().DriverControl(arguments[0], id, inputBuf, inBufSize, outputBuf, outBufSize);
+        response.length = outBufSize;
+
+        if (dmosSuccess != status)
+        {
+            LOG_DEBUG << "Driver IO command handler: Failed to execute driver IOCTL operation" << endl;
+            response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
+                DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+            response.binaryMessage = (uint8_t*)"Failed to read from driver";
+        }
+        else
+        {
+            LOG_DEBUG << "Driver IO command handler: Success" << endl;
+            response.binaryMessage = (uint8_t*)outputBuf;
+        }
+    }
+
+    response.type = REPLY_TYPE_BINARY;
+    return response;
+}
+
+
+ResponseMessage CommandsHandler::GetDeviceSilenceMode(vector<string> arguments, unsigned int numberOfArguments)
+{
+    LOG_VERBOSE << __FUNCTION__ << endl;
+    ResponseMessage response;
+    if (ValidArgumentsNumber(__FUNCTION__, numberOfArguments, 1, response.message))
+    {
+        bool silentMode;
+        DeviceManagerOperationStatus status = m_host.GetDeviceManager().GetDeviceSilentMode(arguments[0], silentMode);
+        if (dmosSuccess != status)
+        {
+            LOG_ERROR << "Error while trying to GetDeviceSilenceMode at " << arguments[0] << ". Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status) << endl;
+            response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
+                DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+        }
+        else
+        {
+            stringstream message;
+            message << (silentMode ? 1 : 0);
+            response.message = DecorateResponseMessage(true, message.str());
+        }
+    }
+    response.type = REPLY_TYPE_BUFFER;
+    response.length = response.message.size();
+    return response;
+}
+
+ResponseMessage CommandsHandler::SetDeviceSilenceMode(vector<string> arguments, unsigned int numberOfArguments)
+{
+    LOG_VERBOSE << __FUNCTION__ << endl;
+    ResponseMessage response;
+    if (ValidArgumentsNumber(__FUNCTION__, numberOfArguments, 2, response.message))
+    {
+        {
+            bool silentMode = false;
+
+            if (!Utils::ConvertStringToBool(arguments[1], silentMode))
+            {
+                response.message = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsInvalidArgument));
+            }
+
+            DeviceManagerOperationStatus status = m_host.GetDeviceManager().SetDeviceSilentMode(arguments[0], silentMode);
+            if (dmosSuccess != status)
+            {
+                LOG_ERROR << "Error while trying to SetDeviceSilenceMode at: " << arguments[0] << " to: " + arguments[1] << ". Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status) << endl;
+                response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
+                    DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+            }
+            else
+            {
+                string mode = silentMode ? "Silenced" : "UnSilenced";
+                LOG_INFO << "Device:"<< arguments[0] <<"is now " << mode << endl;
+                stringstream message;
+                message << "Silent mode set to:" << silentMode;
+                response.message = DecorateResponseMessage(true, message.str());
+            }
         }
     }
     response.type = REPLY_TYPE_BUFFER;
@@ -698,11 +894,15 @@ CommandsHandler::CommandsHandler(ServerType type, Host& host) :
         m_functionHandler.insert(make_pair("alloc_pmc", &CommandsHandler::AllocPmc));
         m_functionHandler.insert(make_pair("dealloc_pmc", &CommandsHandler::DeallocPmc));
         m_functionHandler.insert(make_pair("create_pmc_file", &CommandsHandler::CreatePmcFile));
-        m_functionHandler.insert(make_pair("read_pmc_file", &CommandsHandler::ReadPmcFile));
+        m_functionHandler.insert(make_pair("read_pmc_file", &CommandsHandler::FindPmcFile));
         m_functionHandler.insert(make_pair("send_wmi", &CommandsHandler::SendWmi));
         m_functionHandler.insert(make_pair("set_host_alias", &CommandsHandler::SetHostAlias));
         m_functionHandler.insert(make_pair("get_time", &CommandsHandler::GetTime));
         m_functionHandler.insert(make_pair("set_local_driver_mode", &CommandsHandler::SetDriverMode));
+        m_functionHandler.insert(make_pair("get_host_manager_version", &CommandsHandler::GetHostManagerVersion));
+        m_functionHandler.insert(make_pair("driver_control", &CommandsHandler::DriverControl));
+        m_functionHandler.insert(make_pair("set_silence_mode", &CommandsHandler::SetDeviceSilenceMode));
+        m_functionHandler.insert(make_pair("get_silence_mode", &CommandsHandler::GetDeviceSilenceMode));
     }
     else // UDP server
     {
@@ -718,8 +918,6 @@ ConnectionStatus CommandsHandler::ExecuteCommand(string message, ResponseMessage
 
     string commandName = m_pMessageParser->GetCommandFromMessage();
 
-    LOG_DEBUG << "command name: " << commandName << endl; //TODO - remove after test
-
     if (m_functionHandler.find(commandName) == m_functionHandler.end())
     { //There's no such a command, the return value from the map would be null
         LOG_WARNING << "Unknown command from client: " << commandName << endl;
@@ -730,15 +928,15 @@ ConnectionStatus CommandsHandler::ExecuteCommand(string message, ResponseMessage
     }
     referencedResponse = (this->*m_functionHandler[commandName])(m_pMessageParser->GetArgsFromMessage(), m_pMessageParser->GetNumberOfArgs()); //call the function that fits commandName
 
+    return KEEP_CONNECTION_ALIVE;
+}
 
+// *************************************************************************************************
 
-    /* For testing while developing: */
-    vector<string> vec = m_pMessageParser->GetArgsFromMessage(); //TODO - remove after test
-    for (auto i: vec) //TODO - remove after test - print the given arguments
-    {
-        LOG_DEBUG << "argument is: " << i << endl;
-    }
-    /* End of testing for developing */
+ConnectionStatus CommandsHandler::ExecuteBinaryCommand(uint8_t* binaryInput, ResponseMessage &referencedResponse)
+{
+    referencedResponse = GenericDriverIO(referencedResponse.internalParsedMessage, binaryInput, referencedResponse.inputBufSize);
 
     return KEEP_CONNECTION_ALIVE;
 }
+

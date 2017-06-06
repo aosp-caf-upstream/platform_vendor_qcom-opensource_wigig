@@ -27,23 +27,26 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _PMC_FILE_H_
-#define _PMC_FILE_H_
+#ifndef _PMC_DATA_H_
+#define _PMC_DATA_H_
 
-#include <stdio.h>
+#include "OperationStatus.h"
+
 #include <string>
+#include <iostream>
 
 // *************************************************************************************************
 
-// Generates a PMC file name from its ID.
-class PmcFile
+// Locates a PMC data file path according to its ID.
+class PmcDataFileLocator
 {
 public:
 
-    explicit PmcFile(int fileId);
+    explicit PmcDataFileLocator(int fileId);
 
     int GetFileId() const { return m_FileId; }
     const char* GetFileName() const { return m_FileName.c_str(); }
+    bool FileExists() const;
 
     static const char* GetDirectory() { return s_pDirectory; }
 
@@ -57,27 +60,26 @@ private:
 
 };
 
-std::ostream& operator<<(std::ostream& os, const PmcFile& pmcFile);
+std::ostream& operator<<(std::ostream& os, const PmcDataFileLocator& pmcDataFileLocator);
 
 // *************************************************************************************************
 
 // Creates a PMC data file according to a provided ID.
-class PmcFileWriter
+class PmcDataFileWriter
 {
 public:
 
-    explicit PmcFileWriter(const PmcFile& pmcFile);
-
-    bool WriteFile() const;
-    size_t GetFileSize() const;
+    PmcDataFileWriter(int fileId, const char* szDebugFsPath);
+    OperationStatus WriteFile() const;
 
 private:
 
-    bool CreateDirectoryIfNeeded() const;
+    OperationStatus MeetWritePrerequisites() const;
 
-    const PmcFile& m_PmcFile;
+    const PmcDataFileLocator m_PmcDataFileLocator;
+    std::string m_SrcPmcDataPath;
 
 };
 
 
-#endif    // PMC_FILE_H_
+#endif    // _PMC_DATA_H_

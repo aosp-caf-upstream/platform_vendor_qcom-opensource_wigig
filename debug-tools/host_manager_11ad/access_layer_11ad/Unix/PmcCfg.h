@@ -27,47 +27,38 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _FILE_READER_H_
-#define _FILE_READER_H_
+#ifndef _WINDOWS
+#ifndef _PMC_CFG_H_
 
-#include <stdio.h>
-#include <stdlib.h>
+#include "OperationStatus.h"
+
+#include <cstdlib>
 #include <string>
+#include <sstream>
 
 // *************************************************************************************************
 
-// Reads a file from the file system and exports its content to a buffer provided by the caller.
-// If the file is larger than a provide bugffer, it is delivered by chunks of the buffer size.
-// The last chunk may occupy less than the whole buffer. It's a caller's responsibility to allocate
-// the buffer and call the FileReader API untill the file is fully exported.
-
-class FileReader
+class PmcCfg
 {
 public:
 
-    explicit FileReader(const char* pFileName);
-    ~FileReader();
+    explicit PmcCfg(const char* szDebugFsPath);
 
-    size_t ReadChunk(char* pBuf, size_t availableSpace);
+    // DMA Managements
+    OperationStatus AllocateDmaDescriptors(size_t descSize, size_t descNum);
+    OperationStatus FreeDmaDescriptors();
 
-    bool IsCompleted() const { return m_ReadTillNow == m_FileSize; }
-    bool IsError() const { return m_IsError; }
-
-    size_t ReadTillNow() const { return m_ReadTillNow; }
-    size_t GetFileSize() const { return m_FileSize; }
+    // PMC Data Management
+    OperationStatus FlashPmcData();
 
 private:
 
-    bool CanReadFromFile(char* pBuf, size_t availableSpace);
+    OperationStatus WritePmcCommand(const char* szPmcCmd);
+    OperationStatus GetLastOperationStatus();
 
-    const std::string m_FileName;        // File name - cached for tracing
-    FILE* m_pFile;                       // File Handler - open for read
-    size_t m_FileSize;                   // File Size in bytes
-    size_t m_ReadTillNow;                // Bytes read till now
-    bool m_IsCompleted;                  // Set to true when OEF is reached
-    bool m_IsError;                      // Error flag
-
+    std::string m_PmcCfgFilePath;
 };
 
 
-#endif    // _FILE_READER_H_
+#endif  // _PMC_CFG_H_
+#endif  // _WINDOWS

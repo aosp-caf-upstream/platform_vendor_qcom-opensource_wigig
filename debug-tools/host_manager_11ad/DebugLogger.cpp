@@ -37,42 +37,44 @@ LogConfig g_LogConfig(LOG_SEV_INFO, false);
 // *************************************************************************************************
 
 LogConfig::LogConfig(LogSeverity maxSeverity, bool bPrintLocation)
-	: m_MaxSeverity(maxSeverity), m_PrintLocation(bPrintLocation)
+    : m_MaxSeverity(maxSeverity)
+    , m_PrintLocation(bPrintLocation)
+    , m_ExitOnAssert(false)
 {
 }
 
 void LogConfig::SetMaxSeverity(int traceLevel)
 {
-	if (traceLevel > LOG_SEV_VERBOSE)
-	{
-		fprintf(stderr, "Invalid trace level, setting %d\n", LOG_SEV_VERBOSE);
-		m_MaxSeverity = LOG_SEV_VERBOSE;
-	}
-	else
-	{
-		m_MaxSeverity = static_cast<LogSeverity>(traceLevel);
-		fprintf(stdout, "Setting trace level to %d\n", m_MaxSeverity);
-	}
+    if (traceLevel > LOG_SEV_VERBOSE)
+    {
+        fprintf(stderr, "Invalid trace level, setting %d\n", LOG_SEV_VERBOSE);
+        m_MaxSeverity = LOG_SEV_VERBOSE;
+    }
+    else
+    {
+        m_MaxSeverity = static_cast<LogSeverity>(traceLevel);
+        fprintf(stdout, "Setting trace level to %d\n", m_MaxSeverity);
+    }
 }
 
 // *************************************************************************************************
 
 const char* LogMsgPrefix::SeverityToString(LogSeverity sev)
 {
-	static const char* const pSeverityToString[] = { "ERR", "WRN", "INF", "DBG", "VRB" };
+    static const char* const pSeverityToString[] = { "ERR", "WRN", "INF", "DBG", "VRB" };
 
-	size_t index = static_cast<size_t>(sev);
-	if (index >= sizeof(pSeverityToString) / sizeof(pSeverityToString[0]))
-	{
-		return "---";
-	}
+    size_t index = static_cast<size_t>(sev);
+    if (index >= sizeof(pSeverityToString) / sizeof(pSeverityToString[0]))
+    {
+        return "---";
+    }
 
-	return pSeverityToString[index];
+    return pSeverityToString[index];
 }
 
 std::ostream& operator<<(std::ostream& os, const LogMsgPrefix& prefix)
 {
-	os << '[' << LogMsgPrefix::SeverityToString(prefix.Severity) << "] ";
-	if (!g_LogConfig.ShouldPrintLocation()) return os;
-	return os << "(" << prefix.File << ':' << prefix.Line << ") ";
+    os << '[' << LogMsgPrefix::SeverityToString(prefix.Severity) << "] ";
+    if (!g_LogConfig.ShouldPrintLocation()) return os;
+    return os << "(" << prefix.File << ':' << prefix.Line << ") ";
 }

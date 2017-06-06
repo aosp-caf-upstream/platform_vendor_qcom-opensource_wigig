@@ -28,7 +28,7 @@
  */
 
 #include "FileReader.h"
-//#include "DebugLogger.h"
+#include "DebugLogger.h"
 
 #include <cstring>
 #include <cerrno>
@@ -46,29 +46,27 @@ FileReader::FileReader(const char* pFileName)
 {
     if (NULL == pFileName)
     {
-        //LOG_ERROR << "No file name provided" << std::endl;
+        LOG_ERROR << "Invalid file reader created - No file name provided" << std::endl;
         return;
     }
 
-    //LOG_DEBUG << "Opening file reader for: " << m_FileName << std::endl;
+    LOG_VERBOSE << "Opening file reader for: " << m_FileName << std::endl;
     m_pFile = fopen(pFileName, "rb");
 
     if (NULL == m_pFile)
     {
-        //int lastErrno = errno;
-        //LOG_ERROR << "Error opening file."
-            //<< " Name: " << pFileName
-            //<< " Error: " << lastErrno
-            //<< " Message: " << strerror(lastErrno)
-            //<< std::endl;
+        int lastErrno = errno;
+        LOG_ERROR << "Error opening file."
+                  << " Name: " << pFileName
+                  << " Error: " << lastErrno
+                  << " Message: " << strerror(lastErrno)
+                  << std::endl;
         return;
     }
 
     fseek(m_pFile, 0, SEEK_END);
     m_FileSize = ftell(m_pFile);
     rewind(m_pFile);
-
-    //LOG_DEBUG << "Get file size for " << pFileName << ": " << m_FileSize << "B" << std::endl;
 }
 
 // *************************************************************************************************
@@ -77,7 +75,7 @@ FileReader::~FileReader()
 {
     if (m_pFile)
     {
-        //LOG_DEBUG << "Closing the file: " << m_FileName << std::endl;
+        LOG_VERBOSE << "Closing the file: " << m_FileName << std::endl;
         fclose(m_pFile);
         m_pFile = NULL;
     }
@@ -89,36 +87,31 @@ bool FileReader::CanReadFromFile(char* pBuf, size_t availableSpace)
 {
     if (!pBuf)
     {
-        //LOG_ERROR << "Cannot read from file " << m_FileName << ": "
-            //<< "No buffer is provided" << std::endl;
+        LOG_ERROR << "Cannot read from file " << m_FileName << ": " << "No buffer is provided" << std::endl;
         return false;
     }
 
     if (0 == availableSpace)
     {
-        //LOG_ERROR << "Cannot read from file " << m_FileName << ": "
-            //<< "No buffer space is provided" << std::endl;
+        LOG_ERROR << "Cannot read from file " << m_FileName << ": " << "No buffer space is provided" << std::endl;
         return false;
     }
 
     if (NULL == m_pFile)
     {
-        //LOG_ERROR << "Cannot read from file " << m_FileName << ": "
-            //<< "No file handle is available" << std::endl;
+        LOG_ERROR << "Cannot read from file " << m_FileName << ": " << "No file handle is available" << std::endl;
         return false;
     }
 
     if (m_IsCompleted)
     {
-        //LOG_ERROR << "Unexpected read from file " << m_FileName << ": "
-            //<< "EoF is reached" << std::endl;
+        LOG_ERROR << "Unexpected read from file " << m_FileName << ": " << "EoF is reached" << std::endl;
         return false;
     }
 
     if (m_IsError)
     {
-        //LOG_ERROR << "Unexpected read from file " << m_FileName << ": "
-            //<< "Error occured" << std::endl;
+        LOG_ERROR << "Unexpected read from file " << m_FileName << ": " << "Error occured" << std::endl;
         return false;
     }
 
@@ -130,19 +123,18 @@ bool FileReader::CanReadFromFile(char* pBuf, size_t availableSpace)
 
 size_t FileReader::ReadChunk(char* pBuf, size_t availableSpace)
 {
-    //LOG_DEBUG << "Reading a chunk."
-        //<< " File Name: " << m_FileName
-        //<< " File Size: " << m_FileSize << "B"
-        //<< " Read till now: " << m_ReadTillNow << "B"
-        //<< " Buffer: " << availableSpace << "B"
-        //<< " Completed: " << BoolStr(m_IsCompleted)
-        //<< " Error: " << BoolStr(m_IsError)
-        //<< std::endl;
+    LOG_VERBOSE << "Reading a chunk."
+        << " File Name: " << m_FileName
+        << " File Size: " << m_FileSize << "B"
+        << " Read till now: " << m_ReadTillNow << "B"
+        << " Buffer: " << availableSpace << "B"
+        << " Completed: " << BoolStr(m_IsCompleted)
+        << " Error: " << BoolStr(m_IsError)
+        << std::endl;
 
     if (false == CanReadFromFile(pBuf, availableSpace))
     {
-        //LOG_ERROR << "Cannot read from file: " << m_FileName
-            //<< " Check previous errors/status" << std::endl;
+        LOG_ERROR << "Cannot read from file: " << m_FileName << " Check previous errors/status" << std::endl;
         m_IsError = true;
         return 0;
     }
@@ -153,29 +145,29 @@ size_t FileReader::ReadChunk(char* pBuf, size_t availableSpace)
 
     if (feof(m_pFile))
     {
-        //LOG_DEBUG << "EOF reached" << std::endl;
+        LOG_VERBOSE << "EoF reached" << std::endl;
         m_IsCompleted = true;
     }
 
     if (ferror(m_pFile))
     {
-        //int lastErrno = errno;
+        int lastErrno = errno;
         m_IsError = true;
-        //LOG_ERROR << "Cannot read file"
-            //<< " Name: " << m_FileName
-            //<< " Error: " << lastErrno
-            //<< " Message:" << strerror(lastErrno)
-            //<< std::endl;
+        LOG_ERROR << "Cannot read file"
+                  << " Name: " << m_FileName
+                  << " Error: " << lastErrno
+                  << " Message:" << strerror(lastErrno)
+                  << std::endl;
     }
 
-    //LOG_VERBOSE << "Got a chunk."
-        //<< " File Name: " << m_FileName
-        //<< " File Size: " << m_FileSize << "B"
-        //<< " Read till now: " << m_ReadTillNow << "B"
-        //<< " Buffer: " << availableSpace << "B"
-        //<< " Completed: " << BoolStr(m_IsCompleted)
-        //<< " Error: " << BoolStr(m_IsError)
-        //<< std::endl;
+    LOG_VERBOSE << "Got a chunk."
+                << " File Name: " << m_FileName
+                << " File Size: " << m_FileSize << "B"
+                << " Read till now: " << m_ReadTillNow << "B"
+                << " Buffer: " << availableSpace << "B"
+                << " Completed: " << BoolStr(m_IsCompleted)
+                << " Error: " << BoolStr(m_IsError)
+                << std::endl;
 
     return readBytes;
 

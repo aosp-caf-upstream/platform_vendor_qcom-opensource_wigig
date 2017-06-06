@@ -50,6 +50,8 @@ public:
         m_initialized = false;
 
         m_basebandType = BASEBAND_TYPE_NONE;
+
+        m_isSilent = false;
     }
 
     // ************************** Device API ****************************//
@@ -64,7 +66,8 @@ public:
         (void)address;
         (void)value;
         return false;
-    };
+    }
+
     virtual bool ReadBlock(DWORD address, DWORD blockSize, vector<DWORD>& values)
     {
         //do something with params
@@ -72,20 +75,23 @@ public:
         (void)blockSize;
         (void)values;
         return false;
-    };
+    }
 
     virtual bool Write(DWORD address, DWORD value)
     {
         //do something with params
         (void)address;
         (void)value;
-        return false; };
+        return false;
+ 	}
+
     virtual bool WriteBlock(DWORD address, vector<DWORD> values)
     {
         //do something with params
         (void)address;
         (void)values;
-        return false; };
+        return false;
+    }
 
     // Polling function
     //vector<DeviceEvent> DoPoll();
@@ -93,22 +99,33 @@ public:
     // Functionality common to all devices
     bool SwReset() { return false; }
 
-    virtual bool AllocPmc(unsigned descSize, unsigned descNum)
+    virtual bool AllocPmc(unsigned descSize, unsigned descNum, std::string& outMessage)
     {
         //do something with params
         (void)descSize;
         (void)descNum;
         return false;
-    } // TODO: implement
+    }
 
-    virtual bool DeallocPmc() { return false; } // TODO: implement
+    virtual bool DeallocPmc(std::string& outMessage)
+    {
+        (void)outMessage;
+        return false;
+    }
 
-    virtual bool CreatePmcFile(unsigned refNumber)
+    virtual bool CreatePmcFile(unsigned refNumber, std::string& outMessage)
     {
         //do something with params
         (void)refNumber;
         return false;
-    } // TODO: implement
+    }
+
+    virtual bool FindPmcFile(unsigned refNumber, std::string& outMessage)
+    {
+        //do something with params
+        (void)refNumber;
+        return false;
+    }
 
     virtual void InterfaceReset() {};
 
@@ -120,6 +137,12 @@ public:
         return false;
     }
 
+    virtual bool DriverControl(uint32_t Id,
+        const void *inBuf, uint32_t inBufSize,
+        void *outBuf, uint32_t outBufSize) {
+        return false;
+    };
+
     bool SendWmi(DWORD command, vector<DWORD> payload)
     {
         //do something with params
@@ -128,6 +151,7 @@ public:
         return false;
 
     }
+
     vector<DWORD> GetWmiEvent()
     {
 
@@ -156,7 +180,7 @@ public:
         return m_deviceName;
     }
 
-    string GetInterfaceName()
+    const string& GetInterfaceName() const
     {
         return m_interfaceName;
     }
@@ -170,6 +194,17 @@ public:
 
         return m_basebandType;
     }
+
+	bool GetSilenceMode()
+	{
+		return m_isSilent;
+	}
+
+	void SetSilenceMode(bool silentMode)
+	{
+		m_isSilent = silentMode;
+	}
+
     virtual ~Device(){};
 protected:
     DWORD m_deviceHandle;
@@ -178,6 +213,8 @@ private:
     string m_deviceName;
     string m_interfaceName;
     BasebandType m_basebandType;
+
+	bool m_isSilent;
 
     BasebandType ReadBasebandType()
     {

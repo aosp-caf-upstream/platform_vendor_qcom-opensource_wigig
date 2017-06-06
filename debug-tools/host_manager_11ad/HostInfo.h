@@ -108,8 +108,7 @@ public:
     */
     void RemoveNewConnectedUser(string user) { m_connectedUsers.erase(user); }
 
-    string GetVersion() { return m_version;  }
-
+    static string GetVersion() { return s_version;  }
 
 private:
     HostIps m_ips; // host's network details // assumption: each host has only one IP address for ethernet interfaces
@@ -118,7 +117,7 @@ private:
     const string m_aliasFileName; // host's alias file
     const string m_oldHostAliasFile; // old location of the host alias
     set<string> m_connectedUsers; // list of users IPs that have a connection to the commandsTcpServer // TODO: change to the user's personal host's name or user's DmTools username
-    string m_version; // host_manager_11ad version // TODO: update m_version
+    const static string s_version; // host_manager_11ad version
     atomic<bool> m_isAliasFileChanged; // when turned on indicates that m_alias contains stale information, so we need to update it from persistency
     mutex m_persistencyLock; // only one thread is allowed to change persistency at a time
 

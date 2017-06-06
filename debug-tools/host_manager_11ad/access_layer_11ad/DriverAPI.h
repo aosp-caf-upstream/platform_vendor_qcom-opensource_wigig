@@ -52,13 +52,18 @@ public:
     virtual bool Write(DWORD address, DWORD value) = 0;
     virtual bool WriteBlock(DWORD addr, DWORD blockSize, const char *arrBlock) = 0;
 
+    virtual bool AllocPmc(unsigned descSize, unsigned descNum, std::string& outMessage) = 0;
+    virtual bool DeallocPmc(std::string& outMessage) = 0;
+    virtual bool CreatePmcFile(unsigned refNumber, std::string& outMessage) = 0;
+    virtual bool FindPmcFile(unsigned refNumber, std::string& outMessage) = 0;
+
     virtual bool IsOpened(void) = 0;
 
     virtual bool Open() = 0;
     virtual bool ReOpen() = 0;
-    virtual bool Ioctl(uint32_t Id,
-                       const void *inBuf, uint32_t inBufSize,
-                       void *outBuf, uint32_t outBufSize) = 0;
+    virtual bool DriverControl(uint32_t Id,
+        const void *inBuf, uint32_t inBufSize,
+        void *outBuf, uint32_t outBufSize) = 0;
     virtual DWORD DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DWORD DebugFSFlags)
     {
         //do something with params

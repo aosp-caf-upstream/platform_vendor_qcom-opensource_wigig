@@ -29,9 +29,15 @@
 
 #ifndef _WINDOWS
 
-#include <iostream>
-
+#include "DebugLogger.h"
 #include "UnixDriverAPI.h"
+#include "PmcCfg.h"
+#include "PmcData.h"
+
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <fstream>
 
 #include <net/if.h> // for struct ifreq
 #include <sys/socket.h>
@@ -69,7 +75,6 @@ bool UnixDriverAPI::ReadBlock(DWORD addr, DWORD blockSize, char *arrBlock)
 {
     IoctlIO io;
 
-    // cout << "Read block addr = " << addr << ". block size = " << blockSize << "\n";
 
     //blocks must be 32bit alligned!
     int numReads = blockSize / 4;
@@ -79,13 +84,11 @@ bool UnixDriverAPI::ReadBlock(DWORD addr, DWORD blockSize, char *arrBlock)
     {
         if (!SendRWIoctl(io, m_fileDescriptor, m_interfaceName.c_str()))
         {
-            // cout << "Failed to Read in ReadBlock";
             return false;
         }
 
         // Copy the read 32 bits into the arrBlock
         memcpy(&arrBlock[(i * 4)], &io.val, sizeof(int32_t));
-        // cout << "Read block " << i << " out of " << numReads << ". val = " << io.val << "\n";
 
         io.addr += sizeof(int32_t);
     }
@@ -109,8 +112,6 @@ bool UnixDriverAPI::Write(DWORD address, DWORD value)
 }
 bool UnixDriverAPI::WriteBlock(DWORD addr, DWORD blockSize, const char *arrBlock)
 {
-    // cout << "Write Block addr = " << addr << ". block size = " << blockSize << "\n";
-
     IoctlIO io;
 
     io.addr = addr;
@@ -121,8 +122,6 @@ bool UnixDriverAPI::WriteBlock(DWORD addr, DWORD blockSize, const char *arrBlock
     for (int i = 0; i < sizeToWrite; i++)
     {
         io.val = *((int*)&(arrBlock[i * 4]));
-
-        // cout << "Writing " << io.val << " to address " << io.addr << "\n";
 
         Write(io.addr, io.val);
 
@@ -147,8 +146,6 @@ string GetInterfaceNameFromEP(string pciEndPoint)
     FILE* pIoStream = popen(szInterfaceCmdPattern, "r");
     if (!pIoStream)
     {
-        // cout << "Failed to run command to detect End Points" << "\n";
-        //LOG_MESSAGE_ERROR("Failed to run command to detect End Points\n" );
         return "Invalid";
     }
 
@@ -160,9 +157,6 @@ string GetInterfaceNameFromEP(string pciEndPoint)
         foundInterfaceName[strcspn(foundInterfaceName, "\r\n")] = '\0';
 
         string interfaceName(foundInterfaceName);
-
-        // cout << "PCI interface found: " << interfaceName << "\n";
-        //LOG_MESSAGE_DEBUG("PCI interface found: %s", interfaceName);
 
         pclose(pIoStream);
 
@@ -186,8 +180,6 @@ set<string> GetNetworkInterfaceNames()
     FILE* pIoStream = popen(szCmdPattern, "r");
     if (!pIoStream)
     {
-        // cout << "Failed to run command to detect End Points" << "\n";
-        //LOG_MESSAGE_ERROR("Failed to run command to detect End Points\n" );
         return networkInterfaces;
     }
 
@@ -197,8 +189,6 @@ set<string> GetNetworkInterfaceNames()
         pciEndPoints[strcspn(pciEndPoints, "\r\n")] = '\0';
 
         string pciEndPoint(pciEndPoints);
-        // cout << "PCI End Point Found:" << pciEndPoint << "\n";
-        //LOG_MESSAGE_DEBUG("PCI End Point Found: %s", pciEndPoint.c_str());
 
         // Get interface name from End Point
         string networkInterfaceName = GetInterfaceNameFromEP(pciEndPoint);
@@ -227,14 +217,9 @@ bool UnixDriverAPI::Open()
         return true;
     }
 
-    // cout << "Trying to open device:" << m_interfaceName << "\n";
-    //LOG_MESSAGE_DEBUG("Trying to open device:", m_interfaceName.c_str());
-
     m_fileDescriptor = socket(AF_INET, SOCK_DGRAM, 0);
     if (INVALID_FD == m_fileDescriptor || m_fileDescriptor < 0)
     {
-        // cout << "Failed to open socket to device:" << m_interfaceName << "\n";
-        //LOG_MESSAGE_ERROR("Failed to open socket to device %s", m_interfaceName.c_str());
         Close();
         return false;
     }
@@ -242,8 +227,7 @@ bool UnixDriverAPI::Open()
     // Validate interface is 11ad interface
     if(!ValidateInterface())
     {
-        // cout << "Failed to query interface:" << m_interfaceName << "\n";
-        //LOG_MESSAGE_ERROR("Failed to query interface %s", m_interfaceName.c_str());
+
         Close();
         return false;
     }
@@ -251,13 +235,10 @@ bool UnixDriverAPI::Open()
     // Unix command for getting Debug FS path
     string debugFsFind = "echo \"/sys/kernel/debug/ieee80211/$(ls $(find /sys/devices -name " + m_interfaceName + ")/../../ieee80211 | grep -Eo \"phy[0-9]*\")/wil6210\"";
 
-    // cout << debugFsFind << "\n";
 
     FILE* pIoStream = popen(debugFsFind.c_str(), "r");
     if (!pIoStream)
     {
-        // cout << "Failed to run command to detect DebugFS" << "\n";
-        //LOG_MESSAGE_ERROR("Failed to run command to detect DebugFS\n" );
         Close();
         return false;
     }
@@ -269,9 +250,6 @@ bool UnixDriverAPI::Open()
         debugFSPath[strcspn(debugFSPath, "\r\n")] = '\0';
         string str = (debugFSPath);
         m_debugFsPath = str;
-
-        // cout << "Found DebugFS Path:" << m_debugFsPath << "\n";
-        //LOG_MESSAGE_DEBUG("Found DebugFS Path: %s", debugFSPath);
     }
 
     pclose(pIoStream);
@@ -297,6 +275,61 @@ DWORD UnixDriverAPI::DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DW
     (void)dataBufLen;
     (void)DebugFSFlags;
     return 0;
+}
+
+bool UnixDriverAPI::AllocPmc(unsigned descSize, unsigned descNum, string& outMessage)
+{
+    PmcCfg pmcCfg(m_debugFsPath.c_str());
+    OperationStatus st = pmcCfg.AllocateDmaDescriptors(descSize, descNum);
+
+    outMessage = st.GetMessage();
+    return st.IsSuccess();
+}
+
+bool UnixDriverAPI::DeallocPmc(std::string& outMessage)
+{
+    PmcCfg pmcCfg(m_debugFsPath.c_str());
+    OperationStatus st = pmcCfg.FreeDmaDescriptors();
+
+    outMessage = st.GetMessage();
+    return st.IsSuccess();
+}
+
+bool UnixDriverAPI::CreatePmcFile(unsigned refNumber, std::string& outMessage)
+{
+    LOG_DEBUG << "Creating PMC data file #" << refNumber << std::endl;
+
+    PmcDataFileWriter pmcFileWriter(refNumber, m_debugFsPath.c_str());
+
+    OperationStatus st = pmcFileWriter.WriteFile();
+    outMessage = st.GetMessage();
+
+    if (!st.IsSuccess())
+    {
+        LOG_ERROR << "Error creating PMC data file for #" << refNumber << std::endl;
+        return false;
+    }
+
+    LOG_DEBUG << "PMC data file created. Reported size: " << st.GetMessage() << std::endl;
+    return true;
+}
+
+bool UnixDriverAPI::FindPmcFile(unsigned refNumber, std::string& outMessage)
+{
+    LOG_DEBUG << "Looking for the PMC File #" << refNumber << endl;
+
+    PmcDataFileLocator pmcDataFileLocator(refNumber);
+
+    if (!pmcDataFileLocator.FileExists())
+    {
+        std::stringstream errorMsgBuilder;
+        errorMsgBuilder << "Cannot find PMC file " << pmcDataFileLocator.GetFileName();
+        outMessage = errorMsgBuilder.str();
+        return false;
+    }
+
+    outMessage = pmcDataFileLocator.GetFileName();
+    return true;
 }
 
 void UnixDriverAPI::Close()
@@ -328,9 +361,9 @@ void UnixDriverAPI::Reset()
     return;
 }
 
-bool UnixDriverAPI::Ioctl(uint32_t Id,
-                          const void *inBuf, uint32_t inBufSize,
-                          void *outBuf, uint32_t outBufSize)
+bool UnixDriverAPI::DriverControl(uint32_t Id,
+    const void *inBuf, uint32_t inBufSize,
+    void *outBuf, uint32_t outBufSize)
 {
     //do something with params
     (void)Id;
@@ -346,10 +379,6 @@ bool UnixDriverAPI::SendRWIoctl(IoctlIO & io, int fd, const char* interfaceName)
     int ret;
     struct ifreq ifr;
     ifr.ifr_data = (char*)&io;
-
-    // cout << "Address is " << hex << io.addr << "\n";
-    // cout << "fd is " << fd << "\n";
-    // cout << "interfaceName is " << interfaceName << "\n";
 
     snprintf(ifr.ifr_name, IFNAMSIZ, "%s", interfaceName);
     ifr.ifr_name[IFNAMSIZ - 1] = 0;
@@ -370,13 +399,8 @@ bool UnixDriverAPI::ValidateInterface()
     io.addr = 0x880050; //baud rate
     io.op = EP_OPERATION_READ;
 
-    // cout << "Checking interface name:" << m_interfaceName << "\n";
-    //LOG_MESSAGE_DEBUG("Checking interface name: %s", m_interfaceName.c_str());
-
     if(SendRWIoctl(io, m_fileDescriptor, m_interfaceName.c_str()))
     {
-        // cout << "Successfuly set interface name:" << m_interfaceName << "\n";
-        //LOG_MESSAGE_DEBUG("Successfuly set interface name: %s", interfaceName);
         return true;
     }
 

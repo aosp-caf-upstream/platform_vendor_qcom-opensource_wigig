@@ -69,6 +69,8 @@ void UdpServer::StartServer()
 
 void UdpServer::Stop()
 {
+    LOG_INFO << "Stopping the UDP server" << endl;
+    m_pSocket->Close();
     m_pSocket.reset();
 }
 

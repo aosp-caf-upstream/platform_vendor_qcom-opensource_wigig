@@ -50,7 +50,7 @@ class PciDevice : public Device
 {
 public:
     PciDevice(string deviceName, string interfaceName);
-    ~PciDevice();
+    virtual ~PciDevice();
 
     // Device Management
     bool Open();
@@ -62,10 +62,16 @@ public:
     bool Write(DWORD address, DWORD value);
     bool WriteBlock(DWORD address, vector<DWORD> values);
 
+    virtual bool AllocPmc(unsigned descSize, unsigned descNum, std::string& outMessage);
+    virtual bool DeallocPmc(std::string& outMessage);
+    virtual bool CreatePmcFile(unsigned refNumber, std::string& outMessage);
+    virtual bool FindPmcFile(unsigned refNumber, std::string& outMessage);
+
     virtual void InterfaceReset();
 
     virtual bool SetDriverMode(int newState, int &oldState);
     virtual int GetDriverMode(int &currentState);
+    virtual bool DriverControl(uint32_t Id, const void *inBuf, uint32_t inBufSize, void *outBuf, uint32_t outBufSize);
 
     static set<string> Enumerate();
 

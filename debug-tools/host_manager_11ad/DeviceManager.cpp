@@ -34,6 +34,7 @@
 #include "DeviceManager.h"
 #include "Utils.h"
 #include "AccessLayerAPI.h"
+#include "DebugLogger.h"
 
 DeviceManager::DeviceManager() :
     m_deviceManagerRestDurationMs(500),
@@ -74,6 +75,8 @@ string DeviceManager::GetDeviceManagerOperationStatusString(DeviceManagerOperati
         return "Send WMI failure";
     case dmosFail:
         return "Operation failure";
+	case dmosSilentDevice:
+		return "Device is in silent mode";
     default:
         return "DeviceManagerOperationStatus is unknown ";
     }
@@ -109,10 +112,15 @@ DeviceManagerOperationStatus DeviceManager::CloseInterface(string deviceName)
 
 DeviceManagerOperationStatus DeviceManager::Read(string deviceName, DWORD address, DWORD& value)
 {
-	if ((0 == address) || (0 != address % 4) || (0xFFFFFFFF == address))
+	if (IsDeviceSilent(deviceName))
 	{
-		return dmosInvalidAddress;
+		return dmosSilentDevice;
 	}
+
+    if ((0 == address) || (0 != address % 4) || (0xFFFFFFFF == address))
+    {
+        return dmosInvalidAddress;
+    }
 
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -143,10 +151,15 @@ DeviceManagerOperationStatus DeviceManager::Read(string deviceName, DWORD addres
 
 DeviceManagerOperationStatus DeviceManager::Write(string deviceName, DWORD address, DWORD value)
 {
-	if ((0 == address) || (0 != address % 4) || (0xFFFFFFFF == address))
+	if (IsDeviceSilent(deviceName))
 	{
-		return dmosInvalidAddress;
+		return dmosSilentDevice;
 	}
+
+    if ((0 == address) || (0 != address % 4) || (0xFFFFFFFF == address))
+    {
+        return dmosInvalidAddress;
+    }
 
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -175,10 +188,15 @@ DeviceManagerOperationStatus DeviceManager::Write(string deviceName, DWORD addre
 
 DeviceManagerOperationStatus DeviceManager::ReadBlock(string deviceName, DWORD address, DWORD blockSize, vector<DWORD>& values)
 {
-	if ((0 == address) || (0 != address % 4) || (0xFFFFFFFF == address))
+	if (IsDeviceSilent(deviceName))
 	{
-		return dmosInvalidAddress;
+		return dmosSilentDevice;
 	}
+
+    if ((0 == address) || (0 != address % 4) || (0xFFFFFFFF == address))
+    {
+        return dmosInvalidAddress;
+    }
 
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -209,10 +227,15 @@ DeviceManagerOperationStatus DeviceManager::ReadBlock(string deviceName, DWORD a
 
 DeviceManagerOperationStatus DeviceManager::WriteBlock(string deviceName, DWORD address, const vector<DWORD>& values)
 {
-	if ((0 == address) || (0 != address % 4) || (0xFFFFFFFF == address))
+	if (IsDeviceSilent(deviceName))
 	{
-		return dmosInvalidAddress;
+		return dmosSilentDevice;
 	}
+
+    if ((0 == address) || (0 != address % 4) || (0xFFFFFFFF == address))
+    {
+        return dmosInvalidAddress;
+    }
 
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -288,47 +311,20 @@ DeviceManagerOperationStatus DeviceManager::SwReset(string deviceName)
 
 DeviceManagerOperationStatus DeviceManager::SetDriverMode(string deviceName, int newMode, int& oldMode)
 {
-	DeviceManagerOperationStatus status;
-	m_connectedDevicesMutex.lock();
-	if (m_connectedDevices.count(deviceName) > 0)
-	{
-		m_connectedDevices[deviceName]->m_mutex.lock();
-		m_connectedDevicesMutex.unlock();
-		bool success = m_connectedDevices[deviceName]->m_device->SetDriverMode(newMode, oldMode);
-		if (success)
-		{
-			status = dmosSuccess;
-		}
-		else
-		{
-			status = dmosFailedToResetSw;
-		}
-		m_connectedDevices[deviceName]->m_mutex.unlock();
-		return status;
-	}
-	else
-	{
-		m_connectedDevicesMutex.unlock();
-		return dmosNoSuchConnectedDevice;
-	}
-}
-
-DeviceManagerOperationStatus DeviceManager::AllocPmc(string deviceName, unsigned descSize, unsigned descNum)
-{
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
     if (m_connectedDevices.count(deviceName) > 0)
     {
         m_connectedDevices[deviceName]->m_mutex.lock();
         m_connectedDevicesMutex.unlock();
-        bool success = m_connectedDevices[deviceName]->m_device->AllocPmc(descSize, descNum);
+        bool success = m_connectedDevices[deviceName]->m_device->SetDriverMode(newMode, oldMode);
         if (success)
         {
             status = dmosSuccess;
         }
         else
         {
-            status = dmosFailedToAllocatePmc;
+            status = dmosFailedToResetSw;
         }
         m_connectedDevices[deviceName]->m_mutex.unlock();
         return status;
@@ -340,7 +336,7 @@ DeviceManagerOperationStatus DeviceManager::AllocPmc(string deviceName, unsigned
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::DeallocPmc(string deviceName)
+DeviceManagerOperationStatus DeviceManager::DriverControl(string deviceName, uint32_t Id, const void *inBuf, uint32_t inBufSize, void *outBuf, uint32_t outBufSize)
 {
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -348,13 +344,73 @@ DeviceManagerOperationStatus DeviceManager::DeallocPmc(string deviceName)
     {
         m_connectedDevices[deviceName]->m_mutex.lock();
         m_connectedDevicesMutex.unlock();
-        bool success = m_connectedDevices[deviceName]->m_device->DeallocPmc();
+        bool success = m_connectedDevices[deviceName]->m_device->DriverControl(Id, inBuf, inBufSize, outBuf, outBufSize);
         if (success)
         {
             status = dmosSuccess;
         }
         else
         {
+            status = dmosFailedToReadFromDevice;
+        }
+        m_connectedDevices[deviceName]->m_mutex.unlock();
+        return status;
+    }
+    else
+    {
+        m_connectedDevicesMutex.unlock();
+        return dmosNoSuchConnectedDevice;
+    }
+}
+
+DeviceManagerOperationStatus DeviceManager::AllocPmc(string deviceName, unsigned descSize, unsigned descNum, string& errorMsg)
+{
+    DeviceManagerOperationStatus status;
+    m_connectedDevicesMutex.lock();
+
+    if (m_connectedDevices.count(deviceName) > 0)
+    {
+        m_connectedDevices[deviceName]->m_mutex.lock();
+        m_connectedDevicesMutex.unlock();
+
+        bool success = m_connectedDevices[deviceName]->m_device->AllocPmc(descSize, descNum, errorMsg);
+        if (success)
+        {
+            status = dmosSuccess;
+        }
+        else
+        {
+            LOG_ERROR << "Failed to allocate PMC ring: " << errorMsg << std::endl;
+            status = dmosFailedToAllocatePmc;
+        }
+        m_connectedDevices[deviceName]->m_mutex.unlock();
+        return status;
+    }
+    else
+    {
+        m_connectedDevicesMutex.unlock();
+        errorMsg = "No device found";
+        return dmosNoSuchConnectedDevice;
+    }
+}
+
+DeviceManagerOperationStatus DeviceManager::DeallocPmc(string deviceName, std::string& outMessage)
+{
+    DeviceManagerOperationStatus status;
+    m_connectedDevicesMutex.lock();
+    if (m_connectedDevices.count(deviceName) > 0)
+    {
+        m_connectedDevices[deviceName]->m_mutex.lock();
+        m_connectedDevicesMutex.unlock();
+
+        bool success = m_connectedDevices[deviceName]->m_device->DeallocPmc(outMessage);
+        if (success)
+        {
+            status = dmosSuccess;
+        }
+        else
+        {
+            LOG_ERROR << "Failed to de-allocate PMC ring: " << outMessage << std::endl;
             status = dmosFailedToDeallocatePmc;
         }
         m_connectedDevices[deviceName]->m_mutex.unlock();
@@ -367,7 +423,7 @@ DeviceManagerOperationStatus DeviceManager::DeallocPmc(string deviceName)
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::CreatePmcFile(string deviceName, unsigned refNumber)
+DeviceManagerOperationStatus DeviceManager::CreatePmcFile(string deviceName, unsigned refNumber, std::string& outMessage)
 {
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -375,7 +431,34 @@ DeviceManagerOperationStatus DeviceManager::CreatePmcFile(string deviceName, uns
     {
         m_connectedDevices[deviceName]->m_mutex.lock();
         m_connectedDevicesMutex.unlock();
-        bool success = m_connectedDevices[deviceName]->m_device->CreatePmcFile(refNumber);
+        bool success = m_connectedDevices[deviceName]->m_device->CreatePmcFile(refNumber, outMessage);
+        if (success)
+        {
+            status = dmosSuccess;
+        }
+        else
+        {
+            status = dmosFailedToCreatePmcFile;
+        }
+        m_connectedDevices[deviceName]->m_mutex.unlock();
+        return status;
+    }
+    else
+    {
+        m_connectedDevicesMutex.unlock();
+        return dmosNoSuchConnectedDevice;
+    }
+}
+
+DeviceManagerOperationStatus DeviceManager::FindPmcFile(string deviceName, unsigned refNumber, std::string& outMessage)
+{
+    DeviceManagerOperationStatus status;
+    m_connectedDevicesMutex.lock();
+    if (m_connectedDevices.count(deviceName) > 0)
+    {
+        m_connectedDevices[deviceName]->m_mutex.lock();
+        m_connectedDevicesMutex.unlock();
+        bool success = m_connectedDevices[deviceName]->m_device->FindPmcFile(refNumber, outMessage);
         if (success)
         {
             status = dmosSuccess;
@@ -396,6 +479,11 @@ DeviceManagerOperationStatus DeviceManager::CreatePmcFile(string deviceName, uns
 
 DeviceManagerOperationStatus DeviceManager::SendWmi(string deviceName, DWORD command, const vector<DWORD>& payload)
 {
+	if (IsDeviceSilent(deviceName))
+	{
+		return dmosSilentDevice;
+	}
+
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
     if (m_connectedDevices.count(deviceName) > 0)
@@ -436,19 +524,44 @@ void DeviceManager::DeleteDevice(string deviceName)
     m_connectedDevices[deviceName]->m_mutex.lock();
     // no need that the mutex will be still locked since new clients have to get m_connectedDevicesMutex before they try to get m_mutex
     m_connectedDevices[deviceName]->m_mutex.unlock();
-    AccessLayer::CloseDevice(deviceName);
+    m_connectedDevices[deviceName]->m_device.reset();
     m_connectedDevices.erase(deviceName);
     m_connectedDevicesMutex.unlock();
 }
 
 void DeviceManager::UpdateConnectedDevices()
 {
-    set<string> currentlyConnectedDevices = AccessLayer::GetDevices();
-
-    // delete devices that arn't connected anymore
     vector<string> devicesForRemove;
+    // Delete unresponsive devices
     for (auto& connectedDevice : m_connectedDevices)
     {
+		if (connectedDevice.second->m_device->GetSilenceMode()) //GetSilenceMode retunrs true if the device is silent the skip th update
+		{
+			continue;
+		}
+        DWORD value;
+        if (!connectedDevice.second->m_device->Read(BAUD_RATE_REGISTER, value))
+        {
+            devicesForRemove.push_back(connectedDevice.first);
+        }
+    }
+    for (auto& device : devicesForRemove)
+    {
+        DeleteDevice(device);
+    }
+
+    devicesForRemove.clear();
+
+    set<string> currentlyConnectedDevices = AccessLayer::GetDevices();
+
+    // delete devices that arn't connected anymore according to enumeration
+    for (auto& connectedDevice : m_connectedDevices)
+    {
+		if (connectedDevice.second->m_device->GetSilenceMode()) //GetSilenceMode retunrs true if the device is silent the skip th update
+		{
+			continue;
+		}
+
         if (0 == currentlyConnectedDevices.count(connectedDevice.first))
         {
             devicesForRemove.push_back(connectedDevice.first);
@@ -481,10 +594,82 @@ void DeviceManager::PeriodicTasks()
         UpdateConnectedDevices();
         for (auto& connectedDevice : m_connectedDevices)
         {
+			if (connectedDevice.second->m_device->GetSilenceMode()) //GetSilenceMode retunrs true if the device is silent the skip the periodic task
+			{
+				continue;
+			}
             connectedDevice.second->m_mutex.lock();
             connectedDevice.second->m_device->Poll();
             connectedDevice.second->m_mutex.unlock();
         }
         this_thread::sleep_for(std::chrono::milliseconds(m_deviceManagerRestDurationMs));
     }
+}
+
+bool DeviceManager::IsDeviceSilent(string deviceName)
+{
+    bool isSilent = false;
+    m_connectedDevicesMutex.lock();
+    if (m_connectedDevices.count(deviceName) <= 0)
+    {
+        m_connectedDevicesMutex.unlock();
+        return isSilent;
+    }
+
+    if ((NULL == m_connectedDevices[deviceName]) || (NULL == m_connectedDevices[deviceName]->m_device))
+    {
+        LOG_ERROR << "Invalid device pointer in IsDeviceSilent (NULL)" << endl;
+        m_connectedDevicesMutex.unlock();
+        return isSilent;
+    }
+
+    m_connectedDevices[deviceName]->m_mutex.lock();
+    m_connectedDevicesMutex.unlock();
+
+    isSilent = m_connectedDevices[deviceName]->m_device->GetSilenceMode();
+
+    m_connectedDevices[deviceName]->m_mutex.unlock();
+
+    return isSilent;
+}
+
+DeviceManagerOperationStatus DeviceManager::SetDeviceSilentMode(string deviceName, bool silentMode)
+{
+    DeviceManagerOperationStatus status;
+	m_connectedDevicesMutex.lock();
+	if (m_connectedDevices.count(deviceName) > 0)
+	{
+		m_connectedDevices[deviceName]->m_mutex.lock();
+		m_connectedDevicesMutex.unlock();
+		m_connectedDevices[deviceName]->m_device->SetSilenceMode(silentMode);
+        status = dmosSuccess;
+	}
+	else
+	{
+		m_connectedDevicesMutex.unlock();
+        status = dmosNoSuchConnectedDevice;
+	}
+    m_connectedDevices[deviceName]->m_mutex.unlock();
+    return status;
+}
+
+
+DeviceManagerOperationStatus  DeviceManager::GetDeviceSilentMode(string deviceName, bool& silentMode)
+{
+    DeviceManagerOperationStatus status;
+	m_connectedDevicesMutex.lock();
+	if (m_connectedDevices.count(deviceName) > 0)
+	{
+		m_connectedDevices[deviceName]->m_mutex.lock();
+		m_connectedDevicesMutex.unlock();
+		silentMode = m_connectedDevices[deviceName]->m_device->GetSilenceMode();
+        status = dmosSuccess;
+	}
+	else
+	{
+		m_connectedDevicesMutex.unlock();
+        status = dmosNoSuchConnectedDevice;
+	}
+    m_connectedDevices[deviceName]->m_mutex.unlock();
+    return status;
 }

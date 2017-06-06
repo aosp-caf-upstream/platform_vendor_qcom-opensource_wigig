@@ -29,13 +29,12 @@
 
 
 #include "ArgumentsParser.h"
+#include "HostInfo.h"
 
 #include <cstdio>
 #include <vector>
 #include <string>
 #include <algorithm>
-
-#define HOST_MANAGER_VERSION 0x0100
 
 using namespace std;
 // *************************************************************************************************
@@ -52,7 +51,7 @@ int ArgumentsParser::ParseAndHandleArguments(int argc, char * argv[], unsigned i
     }
     if (DoesArgumentExist("-v"))
     { //Argument for the version of host_manager_11ad
-        printf("Host Manager 11ad v%d.%d\n", HOST_MANAGER_VERSION >> 8, HOST_MANAGER_VERSION & 0xff);
+        printf("Host Manager 11ad v%s\n", HostInfo::GetVersion().c_str());
     }
     if (DoesArgumentExist("-p"))
     { //Argument for setting the port of the commands TCP port
