@@ -32,7 +32,7 @@
 #include "UdpTempOsAbstruction.h"
 #include <iostream>
 
-const string HostInfo::s_version = "1.1.1";
+const string HostInfo::s_version = "1.1.2";
 
 HostInfo::HostInfo() :
     m_alias(""),

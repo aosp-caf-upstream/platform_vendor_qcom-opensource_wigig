@@ -58,6 +58,7 @@ class UnixDriverAPI : public DriverAPI
     #define EP_OPERATION_READ 0
     #define EP_OPERATION_WRITE 1
     #define WIL_IOCTL_MEMIO (SIOCDEVPRIVATE + 2)
+    #define WIL_IOCTL_MEMIO_BLOCK (SIOCDEVPRIVATE + 3)
 
     #define INVALID_FD -1
 
@@ -79,6 +80,13 @@ class UnixDriverAPI : public DriverAPI
         uint32_t val;
     } IoctlIO;
 
+    typedef	struct {
+        uint32_t op;
+		uint32_t addr; /* should be 32-bit aligned */
+		uint32_t size; /* represents the size in bytes. should be multiple of 4 */
+		void* buf; /* block address */
+	} IoctlIOBlock;
+
 public:
     UnixDriverAPI(string interfaceName) : DriverAPI(interfaceName)
     {
@@ -88,7 +96,7 @@ public:
 
     // Base access functions (to be implemented by specific device)
     bool Read(DWORD address, DWORD& value);
-    bool ReadBlock(DWORD addr, DWORD blockSize, char *arrBlock);
+    bool ReadBlock(DWORD addr, DWORD blockSize, char *arrBlock); // blockSize is the size in bytes
     bool Write(DWORD address, DWORD value);
     bool WriteBlock(DWORD addr, DWORD blockSize, const char *arrBlock);
 
@@ -119,7 +127,9 @@ public:
 private:
     bool InternalIoctl(void *dataBuf, DWORD dataBufLen, DWORD ioctlFlags);
     bool SendRWIoctl(IoctlIO & io, int fd, const char* interfaceName);
+    bool SendRWBIoctl(IoctlIOBlock & io, int fd, const char* interfaceName);
     bool ValidateInterface();
+    bool SetDebugFsPath();
 
     bool m_initialized;
 

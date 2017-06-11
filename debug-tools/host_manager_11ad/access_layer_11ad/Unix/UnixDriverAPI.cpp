@@ -44,8 +44,11 @@
 #include <sys/types.h>
 #include <sys/ioctl.h> // for struct ifreq
 
-#define END_POINT_RESULT_MAX_SIZE 256
-#define NETWORK_INTERFACE_RESULT_MAX_SIZE 256
+#include <sys/types.h> // for opendir
+#include <dirent.h> // for opendir
+
+static const string PCI_END_POINT_FOLDER = "/sys/module/wil6210/drivers/pci:wil6210/";
+static const char* INVALID = "Invalid";
 
 using namespace std;
 
@@ -71,30 +74,18 @@ bool UnixDriverAPI::Read(DWORD address, DWORD& value)
 
     return true;
 }
+
 bool UnixDriverAPI::ReadBlock(DWORD addr, DWORD blockSize, char *arrBlock)
 {
-    IoctlIO io;
-
-
-    //blocks must be 32bit alligned!
-    int numReads = blockSize / 4;
+    IoctlIOBlock io;
     io.op = EP_OPERATION_READ;
     io.addr = addr;
-    for (int i = 0; i < numReads; i++)
-    {
-        if (!SendRWIoctl(io, m_fileDescriptor, m_interfaceName.c_str()))
-        {
-            return false;
-        }
+    io.size = blockSize;
+    io.buf = arrBlock;
 
-        // Copy the read 32 bits into the arrBlock
-        memcpy(&arrBlock[(i * 4)], &io.val, sizeof(int32_t));
-
-        io.addr += sizeof(int32_t);
-    }
-
-    return true;
+    return SendRWBIoctl(io, m_fileDescriptor, m_interfaceName.c_str());
 }
+
 bool UnixDriverAPI::Write(DWORD address, DWORD value)
 {
     IoctlIO io;
@@ -112,23 +103,16 @@ bool UnixDriverAPI::Write(DWORD address, DWORD value)
 }
 bool UnixDriverAPI::WriteBlock(DWORD addr, DWORD blockSize, const char *arrBlock)
 {
-    IoctlIO io;
-
-    io.addr = addr;
-
     //blocks must be 32bit alligned!
-    int sizeToWrite = blockSize / 4;
+    int sizeToWrite = (blockSize / 4) * 4;
+
+    IoctlIOBlock io;
     io.op = EP_OPERATION_WRITE;
-    for (int i = 0; i < sizeToWrite; i++)
-    {
-        io.val = *((int*)&(arrBlock[i * 4]));
+    io.addr = addr;
+    io.size = sizeToWrite;
+    io.buf = (void*)arrBlock;
 
-        Write(io.addr, io.val);
-
-        io.addr += sizeof(int32_t);
-    }
-
-    return true;
+    return SendRWBIoctl(io, m_fileDescriptor, m_interfaceName.c_str());
 }
 
 bool UnixDriverAPI::IsOpened(void)
@@ -138,68 +122,63 @@ bool UnixDriverAPI::IsOpened(void)
 
 string GetInterfaceNameFromEP(string pciEndPoint)
 {
-    char szInterfaceCmdPattern[END_POINT_RESULT_MAX_SIZE];
+    // const definitions
+    static const char* CURRENT_DIRECTORY = ".";
+    static const char* PARENT_DIRECTORY = "..";
 
-    // This command translates the End Point to the interface name
-    snprintf(szInterfaceCmdPattern, END_POINT_RESULT_MAX_SIZE, "ls /sys/module/wil6210/drivers/pci:wil6210/%s/net", pciEndPoint.c_str());
-
-    FILE* pIoStream = popen(szInterfaceCmdPattern, "r");
-    if (!pIoStream)
+    stringstream interfaceNameContaingFolder; // path of a folder which contains the interface name of the specific EP
+    interfaceNameContaingFolder << PCI_END_POINT_FOLDER << pciEndPoint << "/net";
+    DIR* dp = opendir(interfaceNameContaingFolder.str().c_str());
+    if (!dp)
     {
-        return "Invalid";
+        return INVALID;
     }
 
-    char foundInterfaceName[NETWORK_INTERFACE_RESULT_MAX_SIZE];
-
-    while (fgets(foundInterfaceName, END_POINT_RESULT_MAX_SIZE, pIoStream) != NULL)
+    dirent* de; // read interface name. We assume there is only one folder, if not we take the first one
+    do
     {
-        // The command output contains a newline character that should be removed
-        foundInterfaceName[strcspn(foundInterfaceName, "\r\n")] = '\0';
-
-        string interfaceName(foundInterfaceName);
-
-        pclose(pIoStream);
-
-        return interfaceName;
+      de = readdir(dp);
+    } while ((de != NULL) && ((strncmp(CURRENT_DIRECTORY, de->d_name, strlen(CURRENT_DIRECTORY)) == 0) || (strncmp(PARENT_DIRECTORY, de->d_name, strlen(PARENT_DIRECTORY)) == 0)));
+    if (NULL == de)
+    {
+        closedir(dp);
+        return INVALID;
     }
 
-    pclose(pIoStream);
-    return "Invalid";
+    closedir(dp);
+    return de->d_name;
 }
 
 set<string> GetNetworkInterfaceNames()
 {
     set<string> networkInterfaces;
 
-    // Holds the console ouput containing the current End Point
-    char pciEndPoints[END_POINT_RESULT_MAX_SIZE];
-
-    // This command retrieves the PCI endpoints enumerated
-    const char* szCmdPattern = "ls /sys/module/wil6210/drivers/pci\\:wil6210 | grep :";
-
-    FILE* pIoStream = popen(szCmdPattern, "r");
-    if (!pIoStream)
+    DIR* dp = opendir(PCI_END_POINT_FOLDER.c_str());
+    if (!dp)
     {
+        LOG_VERBOSE << "Failed to open PCI EP directories" << endl;
         return networkInterfaces;
     }
-
-    while (fgets(pciEndPoints, END_POINT_RESULT_MAX_SIZE, pIoStream) != NULL)
+    dirent* de;
+    while ((de = readdir(dp)) != NULL) // iterate through directory content and search for End Point folders
     {
-        // The command output contains a newline character that should be removed
-        pciEndPoints[strcspn(pciEndPoints, "\r\n")] = '\0';
-
-        string pciEndPoint(pciEndPoints);
-
-        // Get interface name from End Point
-        string networkInterfaceName = GetInterfaceNameFromEP(pciEndPoint);
-
-        if (networkInterfaceName != "Invalid")
+        string potentialPciEndPoint(de->d_name);
+        if (potentialPciEndPoint.find(":") != string::npos) // only PCI end point has ":" in its name
         {
-            networkInterfaces.insert(networkInterfaceName);
+            // Get interface name from End Point
+            string networkInterfaceName = GetInterfaceNameFromEP(potentialPciEndPoint);
+            if (networkInterfaceName != INVALID)
+            {
+                networkInterfaces.insert(networkInterfaceName);
+            }
+            else
+            {
+                LOG_VERBOSE << "Failed to find interface name for EP: " << potentialPciEndPoint << endl;
+            }
         }
     }
 
-    pclose(pIoStream);
+    closedir(dp);
     return networkInterfaces;
 }
 
@@ -227,33 +206,55 @@ bool UnixDriverAPI::Open()
     // Validate interface is 11ad interface
     if(!ValidateInterface())
     {
-
         Close();
         return false;
     }
 
-    // Unix command for getting Debug FS path
-    string debugFsFind = "echo \"/sys/kernel/debug/ieee80211/$(ls $(find /sys/devices -name " + m_interfaceName + ")/../../ieee80211 | grep -Eo \"phy[0-9]*\")/wil6210\"";
-
-
-    FILE* pIoStream = popen(debugFsFind.c_str(), "r");
-    if (!pIoStream)
+    if (!SetDebugFsPath())
     {
-        Close();
-        return false;
+        LOG_VERBOSE << "Failed to find debug FS" << endl;
     }
 
-    char debugFSPath[DEBUG_FS_MAX_PATH_LENGTH];
-    while (fgets(debugFSPath, DEBUG_FS_MAX_PATH_LENGTH, pIoStream) != NULL)
-    {
-        // The command output contains a newline character that should be removed
-        debugFSPath[strcspn(debugFSPath, "\r\n")] = '\0';
-        string str = (debugFSPath);
-        m_debugFsPath = str;
-    }
-
-    pclose(pIoStream);
     m_initialized = true;
+    return true;
+}
+
+bool UnixDriverAPI::SetDebugFsPath() // assuming m_interfaceName is set
+{
+    // const definitions
+    static const char* PHY = "phy";
+
+    // find phy number
+    stringstream phyContaingFolder; // path of a folder which contains the phy of the specific interface
+    phyContaingFolder << "/sys/class/net/" << m_interfaceName << "/device/ieee80211";
+    DIR* dp = opendir(phyContaingFolder.str().c_str());
+    if (!dp) // ieee80211 doesn't exist, meaning this isn't an 11ad interface
+    {
+        return false;
+    }
+    dirent* de;// read phy name (phy folder is named phyX where X is a digit). We assume there is only one folder, if not we take the first one
+    do
+    {
+      de = readdir(dp);
+    } while ((de != NULL) && (strncmp(PHY, de->d_name, strlen(PHY)) != 0));
+    if (NULL == de)
+    {
+        closedir(dp);
+        return false;
+    }
+
+    // find debug FS (using phy name)
+    stringstream debugFsPath;
+    debugFsPath << "/sys/kernel/debug/ieee80211/" << de->d_name << "/wil6210";
+    if(-1 == access(debugFsPath.str().c_str(), F_OK)) // didn't find debug FS
+    {
+        closedir(dp);
+        return false;
+    }
+    closedir(dp);
+
+    // update debug FS path
+    m_debugFsPath = debugFsPath.str();
     return true;
 }
 
@@ -383,7 +384,25 @@ bool UnixDriverAPI::SendRWIoctl(IoctlIO & io, int fd, const char* interfaceName)
     snprintf(ifr.ifr_name, IFNAMSIZ, "%s", interfaceName);
     ifr.ifr_name[IFNAMSIZ - 1] = 0;
 
-    ret = ioctl(fd, WIL_IOCTL_MEMIO, &ifr);
+    ret = ioctl(fd, WIL_IOCTL_MEMIO, &ifr); // read/write DWORD
+    if (ret < 0)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool UnixDriverAPI::SendRWBIoctl(IoctlIOBlock & io, int fd, const char* interfaceName)
+{
+    int ret;
+    struct ifreq ifr;
+    ifr.ifr_data = (char*)&io;
+
+    snprintf(ifr.ifr_name, IFNAMSIZ, "%s", interfaceName);
+    ifr.ifr_name[IFNAMSIZ - 1] = 0;
+
+    ret = ioctl(fd, WIL_IOCTL_MEMIO_BLOCK, &ifr);  // read/write BYTES. number of bytes must be multiple of 4
     if (ret < 0)
     {
         return false;
