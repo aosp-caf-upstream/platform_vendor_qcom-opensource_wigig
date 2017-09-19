@@ -103,13 +103,32 @@ flash_image<PRODUCT>::flash_image () :
     raw_data_section ("raw_data_section", raw_data_section_id, &pointer_section.m_pointers.raw_data_pointer, &pointer_section.m_pointers.raw_data_length),
     proxy_product(NULL)
 {
+
+	m_imageSize = 1024 * 512;
+
+	if (PRODUCT::id == talyn::id)
+	{
+		m_imageSize = 1024 * 4 * 512;
+	}
+	else if ((PRODUCT::id == sparrow::id))
+	{
+		m_imageSize = 1024 * 512;
+	}
+
+	m_image = new BYTE[m_imageSize];
+	if (NULL != m_image)
+	{
+		return;
+	}
+
     //    proxy_product = new PRODUCT;
-    memset(m_image, -1, sizeof m_image);
+    memset(m_image, -1, m_imageSize);
 }
 
 template <class PRODUCT>
 flash_image<PRODUCT>::~flash_image ()
 {
+	delete[] m_image;
 }
 
 template <class PRODUCT>
@@ -121,7 +140,7 @@ const BYTE* flash_image<PRODUCT>::get_image (void) const
 template <class PRODUCT>
 u_int32_t flash_image<PRODUCT>::get_image_size (void) const
 {
-    return sizeof m_image;
+    return m_imageSize;
 }
 
 template <class PRODUCT>

@@ -642,15 +642,16 @@ WLCTPCIACSS_API int SwReset(void* pDeviceAccss)
 	}
 
 	// read info from BL
-        hwCopyFromIO(&blInfo, pDeviceAccss, USER_RGF_BL_START_OFFSET, sizeof(USER_RGF_BL_INFO_VER_0));
+	void* pBlInfo = &blInfo; // keep the address in temporary variable to prevent false positive warning
+	hwCopyFromIO(pBlInfo, pDeviceAccss, USER_RGF_BL_START_OFFSET, sizeof(blInfo));
 
 
-        LOG_MESSAGE_INFO(_T("Boot loader information: Ready=0x%x, StructVersion=0x%x, RfType=0x%x BaseBandType=0x%x\n"),
-            blInfo.Ready, blInfo.StructVersion, blInfo.RfType, blInfo.BaseBandType);
+	LOG_MESSAGE_INFO(_T("Boot loader information: Ready=0x%x, StructVersion=0x%x, RfType=0x%x BaseBandType=0x%x\n"),
+		blInfo.Ready, blInfo.StructVersion, blInfo.RfType, blInfo.BaseBandType);
 
-        LOG_MESSAGE_INFO(_T("Boot loader macaddr=%02x:%02x:%02x:%02x:%02x:%02x\n"),
-            blInfo.MacAddr[0], blInfo.MacAddr[1], blInfo.MacAddr[2],
-            blInfo.MacAddr[3], blInfo.MacAddr[4], blInfo.MacAddr[5]);
+	LOG_MESSAGE_INFO(_T("Boot loader macaddr=%02x:%02x:%02x:%02x:%02x:%02x\n"),
+		blInfo.MacAddr[0], blInfo.MacAddr[1], blInfo.MacAddr[2],
+		blInfo.MacAddr[3], blInfo.MacAddr[4], blInfo.MacAddr[5]);
 
 	accssClear32(pDeviceAccss, USER_RGF_CLKS_CTL_0, BIT_USER_CLKS_RST_PWGD); //USER_RGF_CLKS_CTL_0
 
@@ -659,7 +660,8 @@ WLCTPCIACSS_API int SwReset(void* pDeviceAccss)
 	{
 		USER_RGF_BL_INFO_VER_1 blInfoVer1;
 		// print the BL version
-		hwCopyFromIO(&blInfoVer1, pDeviceAccss, USER_RGF_BL_START_OFFSET, sizeof(USER_RGF_BL_INFO_VER_1));
+		void* pBlInfo1 = &blInfoVer1; // keep the address in temporary variable to prevent false positive warning
+		hwCopyFromIO(pBlInfo1, pDeviceAccss, USER_RGF_BL_START_OFFSET, sizeof(blInfoVer1));
 
 		LOG_MESSAGE_INFO(_T("Boot Loader build %d.%d.%d.%d\n"),
 			blInfoVer1.VersionMajor, blInfoVer1.VersionMinor,

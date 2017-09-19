@@ -104,8 +104,8 @@ private:
 #ifdef FLASH_256KB
     BYTE m_image [(1<<21)/8]; //2Mbits - 256KB
 #else
-	BYTE m_image [1024*512]; //1MB
-	// TALYN BYTE m_image [1024*4*512]; //1MB
+	BYTE* m_image;
+	int m_imageSize;
 #endif
 };
 
