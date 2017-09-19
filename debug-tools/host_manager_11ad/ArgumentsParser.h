@@ -44,12 +44,13 @@ using namespace std;
 class ArgumentsParser
 {
 public:
-    int ParseAndHandleArguments(int argc, char* argv[], unsigned int &commandsTcpPort);
+    // retun value - true for continue running host manager, fasle for exit
+    bool ParseAndHandleArguments(int argc, char* argv[], unsigned int &commandsTcpPort);
 
 private:
     vector<string> m_arguments; //Vector that holds each one of the arguments that was given in the command line
-	bool DoesArgumentExist(string option);
-	bool GetArgumentValue(string option, unsigned& val); // returns true iff the argument exists in the srguments list and its value was extracted correctly
+    bool DoesArgumentExist(string option);
+    bool GetArgumentValue(string option, unsigned& val); // returns true iff the argument exists in the srguments list and its value was extracted correctly
 };
 
 #endif // !_ARGUMENTSPARSER_H_

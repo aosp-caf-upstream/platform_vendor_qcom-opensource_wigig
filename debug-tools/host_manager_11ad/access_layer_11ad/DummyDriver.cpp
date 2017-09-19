@@ -28,12 +28,13 @@
  */
 
 #include <sstream>
-#include "TestDevice.h"
+#include "DummyDriver.h"
+#include "../Utils.h"
 
 //////////////////////////////////////////////////////////////////////////
 // Test Device interface
 
-TestDevice::TestDevice(string deviceName, string interfaceName) : Device(deviceName, interfaceName)
+DummyDriver::DummyDriver(string interfaceName) : DriverAPI(interfaceName)
 {
     //LOG_MESSAGE_INFO(_T("Create test device access for: %s"), interfaceName.c_str());
     m_registersAddressToValue.insert(make_pair(0x880050, 0x12345678));
@@ -48,13 +49,13 @@ TestDevice::TestDevice(string deviceName, string interfaceName) : Device(deviceN
     }
 }
 
-TestDevice::~TestDevice()
+DummyDriver::~DummyDriver()
 {
     Close();
 }
 
 // Virtual access functions for device
-bool TestDevice::Read(DWORD address, DWORD& value)
+bool DummyDriver::Read(DWORD address, DWORD& value)
 {
     auto registerElement = m_registersAddressToValue.find(address);
     if (registerElement != m_registersAddressToValue.end())
@@ -63,11 +64,11 @@ bool TestDevice::Read(DWORD address, DWORD& value)
         return true;
 
     }
-    value = Device::GetRegisterDefaultValue();
+    value = Utils::REGISTER_DEFAULT_VALUE;
     return false;
 }
 
-bool TestDevice::ReadBlock(DWORD address, DWORD blockSize, vector<DWORD>& values)
+bool DummyDriver::ReadBlock(DWORD address, DWORD blockSize, vector<DWORD>& values)
 {
     auto registerElement = m_registersAddressToValue.find(address);
     if (registerElement != m_registersAddressToValue.end())
@@ -81,7 +82,7 @@ bool TestDevice::ReadBlock(DWORD address, DWORD blockSize, vector<DWORD>& values
     return false;
 }
 
-bool TestDevice::Write(DWORD address, DWORD value)
+bool DummyDriver::Write(DWORD address, DWORD value)
 {
     auto registerElement = m_registersAddressToValue.find(address);
     if (registerElement != m_registersAddressToValue.end())
@@ -92,7 +93,7 @@ bool TestDevice::Write(DWORD address, DWORD value)
     return false;
 }
 
-bool TestDevice::WriteBlock(DWORD address, vector<DWORD> values)
+bool DummyDriver::WriteBlock(DWORD address, vector<DWORD> values)
 {
     auto registerElement = m_registersAddressToValue.find(address);
     if (registerElement != m_registersAddressToValue.end())
@@ -108,27 +109,27 @@ bool TestDevice::WriteBlock(DWORD address, vector<DWORD> values)
     return false;
 }
 
-bool TestDevice::Open()
+bool DummyDriver::Open()
 {
     return true;
 }
 
-void TestDevice::Close()
+void DummyDriver::Close()
 {
     return;
 }
 
-void TestDevice::InterfaceReset()
+void DummyDriver::InterfaceReset()
 {
     return;
 }
 
-bool TestDevice::SwReset()
+bool DummyDriver::SwReset()
 {
     return true;
 }
 
-set<string> TestDevice::Enumerate()
+set<string> DummyDriver::Enumerate()
 {
     stringstream deviceNameDelimiter;
     deviceNameDelimiter << DEVICE_NAME_DELIMITER;

@@ -32,6 +32,7 @@
 
 #include <string>
 #include <cstdint>
+#include <tuple>
 #include "Utils.h"
 
 
@@ -52,15 +53,22 @@ enum REPLY_TYPE
 /*
  * A response to the client, through the servers
  */
-typedef struct
+struct ResponseMessage
 {
+    ResponseMessage() :
+        type(REPLY_TYPE_NONE),
+        length(0U),
+        binaryMessage(nullptr),
+        inputBufSize(0U)
+    {}
+
     std::string message;
     REPLY_TYPE type;
-    unsigned int length;
+    size_t length;
     uint8_t* binaryMessage;
     vector<string> internalParsedMessage;
-    unsigned int inputBufSize;
-} ResponseMessage;
+    unsigned inputBufSize;
+};
 
 
 // *************************************************************************************************
@@ -75,75 +83,54 @@ enum ConnectionStatus
 
 // **************************** Events Structures and Enum Types **************************************
 /*
- * Define an event struct which would be sent as bytes in packed mode.
- * The concept is to send the smallest message we can as it being sent many times and to multiple clients.
+ * Define an event struct which would be sent as Json string.
  * NOTE that the __exactly__ same struct is defined in the side that gets this struct.
- * The structures sent in packed mode (by using "#pragma pack(push, 1)")
  */
 
-#pragma pack(push, 1) //following structures would be in packed mode
-
-enum HOST_EVENT_TYPE : uint8_t
+struct FwVersion
 {
-    VERSION_CHANGED,
-    CONNECTED_USERS_CHANGED,
-    DEVICES_LIST_CHANGED,
-    DEVICE_EVENT
+    DWORD m_major;
+    DWORD m_minor;
+    DWORD m_subMinor;
+    DWORD m_build;
+
+    FwVersion() :
+        m_major(0), m_minor(0), m_subMinor(0), m_build(0)
+    {}
+
+    bool operator==(const FwVersion& rhs) const
+    {
+        return std::tie(m_major, m_minor, m_subMinor, m_build) == std::tie(rhs.m_major, rhs.m_minor, rhs.m_subMinor, rhs.m_build);
+    }
 };
 
-struct HostEvent
+struct FwTimestamp
 {
-    HostEvent(HOST_EVENT_TYPE hostEventType) :
-        m_marker("TheUtopicHostManager11ad"),
-        m_currentTime(Utils::GetCurrentLocalTime()),
-        m_eventType(hostEventType)
-    { }
+    FwTimestamp() :
+        m_hour(0), m_min(0), m_sec(0), m_day(0), m_month(0), m_year(0)
+    {}
 
-    const string m_marker; // for stream synchronization in DmTools
-    string m_currentTime; // event's genaration time, in YYYY-MM-DD HH:mm:ss.<ms><ms><ms> format
-    HOST_EVENT_TYPE m_eventType; //Value size is uint8_t
-    uint32_t m_payloadSize;
-    uint8_t *payLoad; //The size of the payload (which is the raw data from the device) is given in "payloadSize"
+    DWORD m_hour;
+    DWORD m_min;
+    DWORD m_sec;
+    DWORD m_day;
+    DWORD m_month;
+    DWORD m_year;
+
+    bool operator==(const FwTimestamp& rhs) const
+    {
+        return std::tie(m_hour, m_min, m_sec, m_day, m_month, m_year) == std::tie(rhs.m_hour, rhs.m_min, rhs.m_sec, rhs.m_day, rhs.m_month, rhs.m_year);
+    }
 };
 
-//The type of the event coming from the device - as the device aware of it
-enum DEVICE_EVENT_TYPE : uint8_t
+enum DRIVER_MODE
 {
-    WMI_EVENT,
-    LOG_EVENT,
-    POLLER_EVENT
+    IOCTL_WBE_MODE,
+    IOCTL_WIFI_STA_MODE,
+    IOCTL_WIFI_SOFTAP_MODE,
+    IOCTL_CONCURRENT_MODE,    // This mode is for a full concurrent implementation  (not required mode switch between WBE/WIFI/SOFTAP)
+    IOCTL_SAFE_MODE,          // A safe mode required for driver for protected flows like upgrade and crash dump...
 };
-
-typedef enum _DRIVER_MODE {
-	IOCTL_WBE_MODE,
-	IOCTL_WIFI_STA_MODE,
-	IOCTL_WIFI_SOFTAP_MODE,
-	IOCTL_CONCURRENT_MODE,    // This mode is for a full concurrent implementation  (not required mode switch between WBE/WIFI/SOFTAP)
-	IOCTL_SAFE_MODE,          // A safe mode required for driver for protected flows like upgrade and crash dump...
-} DRIVER_MODE;
-
-struct DeviceEvent : public HostEvent
-{
-    DeviceEvent(DEVICE_EVENT_TYPE deviceEventType) :
-        HostEvent(DEVICE_EVENT),
-        m_deviceEventType(deviceEventType)
-        {}
-
-    DEVICE_EVENT_TYPE m_deviceEventType; //This value size is uint8_t
-    uint16_t m_deviceNameSize; //This value would be sent with the package
-    uint8_t* m_deviceName; //The size of the device name is in "deviceNameSize"
-    uint32_t m_payloadSize;
-    uint8_t* m_payLoad; //The size of the payload (which is the raw data from the device) is given in "payloadSize"
-};
-
-
-//Example for another host event
-//typedef struct _DevicesChangedEvent : HostEvent
-//{
-//
-//} DevicesChangedEvent;
-
-#pragma pack(pop) //stop using packed mode
 
 // *************************************************************************************************
 

@@ -57,6 +57,13 @@ public:
     static bool ConvertDecimalStringToUnsignedInt(string str, unsigned int& ui);
 
     static bool ConvertStringToBool(string str, bool& boolVal);
+
+    const static unsigned int REGISTER_DEFAULT_VALUE;
+
+    const static string PCI;
+    const static string JTAG;
+    const static string SERIAL;
+    const static string DUMMY;
 };
 
 #endif // !_UTILS_H_

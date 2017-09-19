@@ -614,6 +614,21 @@ ResponseMessage CommandsHandler::SetHostAlias(vector<string> arguments, unsigned
 }
 // *************************************************************************************************
 
+ResponseMessage CommandsHandler::GetHostAlias(vector<string> arguments, unsigned int numberOfArguments)
+{
+    LOG_VERBOSE << __FUNCTION__ << endl;
+    ResponseMessage response;
+
+    if (ValidArgumentsNumber(__FUNCTION__, numberOfArguments, 0, response.message))
+    {
+        response.message = DecorateResponseMessage(true, m_host.GetHostInfo().GetAlias());
+    }
+    response.type = REPLY_TYPE_BUFFER;
+    response.length = response.message.size();
+    return response;
+}
+// *************************************************************************************************
+
 ResponseMessage CommandsHandler::GetTime(vector<string> arguments, unsigned int numberOfArguments)
 {
     //do something with params
@@ -768,7 +783,6 @@ ResponseMessage CommandsHandler::GenericDriverIO(vector<string> arguments, void*
         uint8_t* outputBuf = new uint8_t[outBufSize];
         memset(outputBuf, 0, outBufSize);
 
-        cout << "Reading from device" << endl;
         status = m_host.GetDeviceManager().DriverControl(arguments[0], id, inputBuf, inBufSize, outputBuf, outBufSize);
         response.length = outBufSize;
 
@@ -897,6 +911,7 @@ CommandsHandler::CommandsHandler(ServerType type, Host& host) :
         m_functionHandler.insert(make_pair("read_pmc_file", &CommandsHandler::FindPmcFile));
         m_functionHandler.insert(make_pair("send_wmi", &CommandsHandler::SendWmi));
         m_functionHandler.insert(make_pair("set_host_alias", &CommandsHandler::SetHostAlias));
+        m_functionHandler.insert(make_pair("get_host_alias", &CommandsHandler::GetHostAlias));
         m_functionHandler.insert(make_pair("get_time", &CommandsHandler::GetTime));
         m_functionHandler.insert(make_pair("set_local_driver_mode", &CommandsHandler::SetDriverMode));
         m_functionHandler.insert(make_pair("get_host_manager_version", &CommandsHandler::GetHostManagerVersion));

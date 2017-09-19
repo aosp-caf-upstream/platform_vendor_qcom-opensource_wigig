@@ -39,17 +39,22 @@ enum LogSeverity
     LOG_SEV_WARNING = 1,   // Suspicious events
     LOG_SEV_INFO    = 2,   // Events like command/response
     LOG_SEV_DEBUG   = 3,   // Detailed functionality
-    LOG_SEV_VERBOSE = 4    // Excessive debug
+    LOG_SEV_VERBOSE = 4,   // Excessive debug
 };
 
 #define TRACE_WITH_PREFIX(SEV)                                          \
     g_LogConfig.ShouldPrint(SEV) && std::cout << LogMsgPrefix(SEV, __FILE__, __LINE__)
+
 
 #define LOG_ERROR   TRACE_WITH_PREFIX(LOG_SEV_ERROR)
 #define LOG_WARNING TRACE_WITH_PREFIX(LOG_SEV_WARNING)
 #define LOG_INFO    TRACE_WITH_PREFIX(LOG_SEV_INFO)
 #define LOG_DEBUG   TRACE_WITH_PREFIX(LOG_SEV_DEBUG)
 #define LOG_VERBOSE TRACE_WITH_PREFIX(LOG_SEV_VERBOSE)
+
+#define LOG_STATUS                                             \
+    g_LogConfig.ShouldPrintStatus()
+
 
 // Decoupling from system assert allows to print an error message when
 // assert is disabled.
@@ -70,14 +75,20 @@ struct LogConfig
 public:
     LogConfig(LogSeverity maxSeverity, bool bPrintLocation);
     void SetMaxSeverity(int traceLevel);
+    void SetStatusBarPrinter(bool showStatusBar);
 
     bool ShouldPrint(LogSeverity sev) const { return sev <= m_MaxSeverity; }
+    bool ShouldPrintStatus() const
+    {
+        return m_ShowStatusBar;
+    }
     bool ShouldPrintLocation() const { return m_PrintLocation; }
     bool ShouldExitOnAssert() const { return m_ExitOnAssert; }
 
 private:
 
     LogSeverity m_MaxSeverity;
+    bool m_ShowStatusBar;
     const bool m_PrintLocation;
     const bool m_ExitOnAssert;
 

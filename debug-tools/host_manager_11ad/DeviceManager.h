@@ -35,23 +35,13 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <thread>
-#include <mutex>
+#include <future>
 #include <atomic>
 
 #include "HostDefinitions.h"
 #include "Device.h"
 
 using namespace std;
-
-struct ConnectedDevice
-{
-    ConnectedDevice(unique_ptr<Device> device) :
-        m_device(move(device))
-    { }
-
-    shared_ptr<Device> m_device;
-    mutex m_mutex;
-};
 
 enum DeviceManagerOperationStatus
 {
@@ -73,7 +63,7 @@ enum DeviceManagerOperationStatus
 class DeviceManager
 {
 public:
-    DeviceManager();
+    DeviceManager(std::promise<void>& eventsTCPServerReadyPromise);
     ~DeviceManager();
     string GetDeviceManagerOperationStatusString(DeviceManagerOperationStatus status);
 
@@ -99,13 +89,14 @@ public:
     DeviceManagerOperationStatus SetDeviceSilentMode(string deviceName, bool silentMode);
 
 private:
-    void PeriodicTasks();
+    void PeriodicTasks(std::promise<void>& eventsTCPServerReadyPromise);
     void UpdateConnectedDevices();
     void CreateDevice(string deviceName);
     void DeleteDevice(string deviceName);
     bool IsDeviceSilent(string deviceName);
+    string GetStatusBarString(shared_ptr<Device> device);
 
-    unordered_map<string, shared_ptr<ConnectedDevice>> m_connectedDevices; // map from unique string (unique inside a host) to a connected device
+    unordered_map<string, shared_ptr<Device>> m_devices; // map from unique string (unique inside a host) to a connected device
     unsigned const m_deviceManagerRestDurationMs;
     thread m_deviceManager;
     mutex m_connectedDevicesMutex;

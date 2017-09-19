@@ -80,7 +80,7 @@ void UdpServer::BlockingReceive()
     {
         const char* incomingMessage = m_pSocket->Receive(m_maxMessageLength);
         LOG_VERBOSE << "Got Udp message: " << incomingMessage << endl;
-        ResponseMessage referencedResponse = { "", REPLY_TYPE_NONE, 0 };
+        ResponseMessage referencedResponse;
         m_CommandHandler.ExecuteCommand(incomingMessage, referencedResponse);
         if (referencedResponse.length > 0)
         {

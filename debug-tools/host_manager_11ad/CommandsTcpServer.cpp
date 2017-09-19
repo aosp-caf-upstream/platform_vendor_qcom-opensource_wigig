@@ -27,8 +27,8 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "CommandsTcpServer.h"
 #include <thread>
+#include "CommandsTcpServer.h"
 #include "NetworkInterface.h"
 #include "FileReader.h"
 #include "Host.h"
@@ -75,6 +75,8 @@ void CommandsTcpServer::Stop()
     m_pSocket.reset();
 }
 
+
+
 // *************************************************************************************************
 //A thread function to handle each client that connects to the server
 void CommandsTcpServer::ServerThread(NetworkInterfaces::NetworkInterface client)
@@ -82,7 +84,11 @@ void CommandsTcpServer::ServerThread(NetworkInterfaces::NetworkInterface client)
     unique_ptr<CommandsHandler> pCommandsHandler(new CommandsHandler(stTcp, m_host));
     ConnectionStatus keepConnectionAliveFromCommand = KEEP_CONNECTION_ALIVE; //A flag for the content of the command - says if the client wants to close connection
     ConnectionStatus keepConnectionAliveFromReply = KEEP_CONNECTION_ALIVE; //A flag for the reply status, for problems in sending reply etc..
+    //TODO: uncomment when DMTools side is ready
+    // notify that new clinet is connected to the host (send list of connected users before the new one, and notification of the new one - true means connected, false diconnected)
+    Host::GetHost().PushEvent(ClientConnectionEvent(Host::GetHost().GetHostInfo().GetConnectedUsers(), client.GetPeerName(), true));
     m_host.GetHostInfo().AddNewConnectedUser(client.GetPeerName()); // add the user's to the host's connected users
+
 
     do
     {
@@ -102,7 +108,7 @@ void CommandsTcpServer::ServerThread(NetworkInterfaces::NetworkInterface client)
 
             for (auto& message : splitMessages)
             {
-                ResponseMessage referencedResponse = { "", REPLY_TYPE_NONE, 0 };
+                ResponseMessage referencedResponse;
                 if (message.empty())
                 { //message back from the client is "", means the connection is closed
                     break;
@@ -133,6 +139,10 @@ void CommandsTcpServer::ServerThread(NetworkInterfaces::NetworkInterface client)
     //client.close(); //TODO - check how to do it correctly (without exception)
     LOG_INFO << "Closed connection with the client: " << client.GetPeerName() << endl;
     m_host.GetHostInfo().RemoveNewConnectedUser(client.GetPeerName());
+    //TODO: uncomment when DMTools side is ready
+    //notify that new clinet is disconnected from the host
+    Host::GetHost().PushEvent(ClientConnectionEvent(Host::GetHost().GetHostInfo().GetConnectedUsers(), client.GetPeerName(), false));
+
 }
 
 // *************************************************************************************************

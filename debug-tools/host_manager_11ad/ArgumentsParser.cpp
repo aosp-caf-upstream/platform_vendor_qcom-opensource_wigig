@@ -39,7 +39,7 @@
 using namespace std;
 // *************************************************************************************************
 
-int ArgumentsParser::ParseAndHandleArguments(int argc, char * argv[], unsigned int &commandsTcpPort)
+bool ArgumentsParser::ParseAndHandleArguments(int argc, char * argv[], unsigned int &commandsTcpPort)
 {
 
     //do something with params
@@ -50,12 +50,19 @@ int ArgumentsParser::ParseAndHandleArguments(int argc, char * argv[], unsigned i
         m_arguments.push_back(string(argv[i]));
     }
     if (DoesArgumentExist("-v"))
-    { //Argument for the version of host_manager_11ad
-        printf("Host Manager 11ad v%s\n", HostInfo::GetVersion().c_str());
+    { //Argument for the version of host_manager_11ad.
+      // No need to run host manager
+        printf("Host Manager 11ad version: %s\n", HostInfo::GetVersion().c_str());
+        return false;
     }
     if (DoesArgumentExist("-p"))
     { //Argument for setting the port of the commands TCP port
 
+    }
+    if (DoesArgumentExist("-statusBar"))
+    { //Argument for setting the port of the commands TCP port
+        printf("Showing Status Bar Periodically");
+        g_LogConfig.SetStatusBarPrinter(true);
     }
 
     unsigned val;
@@ -64,7 +71,7 @@ int ArgumentsParser::ParseAndHandleArguments(int argc, char * argv[], unsigned i
         g_LogConfig.SetMaxSeverity(val);
     }
 
-    return 0;
+    return true;
 }
 
 bool ArgumentsParser::DoesArgumentExist(string option)

@@ -65,7 +65,7 @@ public:
     * If the connection is lost, remove the client from the list (it is the client's responsibility
     * to renew the connection with this server).
     */
-    bool SendToAllConnectedClients(string message);
+    bool SendToAllConnectedClients(const string& message);
 
     /*
     * Stop the events TCP server by doing some clean ups for the sockets.
@@ -76,9 +76,8 @@ private:
     unsigned int m_port; //The port in which the events TCP server is working on
     shared_ptr<NetworkInterfaces::NetworkInterface> m_pSocket;
     // clientsVector is a vector that keeps all the clients that are connected to the server and want to get events from the device or the host
-    vector<NetworkInterfaces::NetworkInterface> clientsVector;
-    mutex clientsVectorMutex; //Two different (or more) threads can access the clients vector - a mutex is needed
-
+    vector<NetworkInterfaces::NetworkInterface> m_clientsVector;
+    mutex m_clientsVectorMutex; //Two different (or more) threads can access the clients vector - a mutex is needed
 };
 
 

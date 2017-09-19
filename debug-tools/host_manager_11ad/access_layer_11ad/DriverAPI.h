@@ -27,13 +27,18 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _11AD_PCI_DRIVER_API_H_
-#define _11AD_PCI_DRIVER_API_H_
+#ifndef _11AD_DRIVER_API_H_
+#define _11AD_DRIVER_API_H_
 
 #include <string>
 #include <set>
+#include <vector>
+#include <sstream>
 
 #include "OperatingSystemConstants.h"
+#include "Definitions.h"
+#include "../DebugLogger.h"
+#include "../Utils.h"
 
 using namespace std;
 
@@ -43,27 +48,28 @@ public:
     DriverAPI(string interfaceName)
     {
         m_interfaceName = interfaceName;
+        m_initialized = false;
     }
     virtual ~DriverAPI() {};
 
     // Base access functions (to be implemented by specific device)
-    virtual bool Read(DWORD address, DWORD& value) = 0;
-    virtual bool ReadBlock(DWORD addr, DWORD blockSize, char *arrBlock) = 0;
-    virtual bool Write(DWORD address, DWORD value) = 0;
-    virtual bool WriteBlock(DWORD addr, DWORD blockSize, const char *arrBlock) = 0;
+    virtual bool Read(DWORD address, DWORD& value) { return false;  }
+    virtual bool ReadBlock(DWORD addr, DWORD blockSize, vector<DWORD>& values) { return false; }
+    virtual bool Write(DWORD address, DWORD value) { return false; }
+    virtual bool WriteBlock(DWORD addr, vector<DWORD> values) { return false; };
 
-    virtual bool AllocPmc(unsigned descSize, unsigned descNum, std::string& outMessage) = 0;
-    virtual bool DeallocPmc(std::string& outMessage) = 0;
-    virtual bool CreatePmcFile(unsigned refNumber, std::string& outMessage) = 0;
-    virtual bool FindPmcFile(unsigned refNumber, std::string& outMessage) = 0;
+    // PMC functions
+    virtual bool AllocPmc(unsigned descSize, unsigned descNum, std::string& outMessage) { return false; }
+    virtual bool DeallocPmc(std::string& outMessage) { return false; }
+    virtual bool CreatePmcFile(unsigned refNumber, std::string& outMessage) { return false; }
+    virtual bool FindPmcFile(unsigned refNumber, std::string& outMessage) { return false; }
 
-    virtual bool IsOpened(void) = 0;
-
-    virtual bool Open() = 0;
-    virtual bool ReOpen() = 0;
+    virtual bool IsOpen(void) { return m_initialized;  }
+    virtual bool Open() { return false;  }
+    virtual bool ReOpen() { return false; };
     virtual bool DriverControl(uint32_t Id,
         const void *inBuf, uint32_t inBufSize,
-        void *outBuf, uint32_t outBufSize) = 0;
+        void *outBuf, uint32_t outBufSize) { return false; }
     virtual DWORD DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DWORD DebugFSFlags)
     {
         //do something with params
@@ -73,19 +79,22 @@ public:
         (void)DebugFSFlags;
         return -1;
     }
-    virtual void          Close() = 0;
+    virtual void Close() {}
 
-    virtual int GetDriverMode(int &currentState) = 0;
-    virtual bool SetDriverMode(int newState, int &oldState) = 0;
+    virtual int GetDriverMode(int &currentState) { return false;  }
+    virtual bool SetDriverMode(int newState, int &oldState) { return false;  }
 
-    virtual void Reset() = 0;
+    virtual void Reset() {}; // interface reset
+
+    const string& GetInterfaceName() const
+    {
+        return m_interfaceName;
+    }
 
 protected:
     string m_interfaceName;
-    void* m_deviceHandle;
-
-private:
+    bool m_initialized;
 };
 
 
-#endif //_11AD_PCI_DRIVER_API_H_
+#endif //_11AD_DRIVER_API_H_

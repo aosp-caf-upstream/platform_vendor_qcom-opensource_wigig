@@ -29,19 +29,19 @@
 
 #pragma once
 
+#ifndef _11AD_ACCESS_LAYER_H_
+#define _11AD_ACCESS_LAYER_H_
+
+
 #include <memory>
 #include <set>
-#include "Device.h"
+#include "DriverAPI.h"
 
 class AccessLayer
 {
 public:
-    //static void GetVersion(WLCT_DLL_VERSION *pVer);
-    static set<string> GetDevices();
-    static unique_ptr<Device> OpenDevice(string deviceName);
-
-    static set<string> GetTestDevices();
-
-private:
-    static vector<string> Split(const string &message, char delim);
+    static set<string> GetDrivers();
+    static unique_ptr<DriverAPI> OpenDriver(string deviceName);
 };
+
+#endif // _11AD_ACCESS_LAYER_H_

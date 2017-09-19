@@ -30,7 +30,7 @@
 #ifndef _WINDOWS
 
 #include "DebugLogger.h"
-#include "UnixDriverAPI.h"
+#include "UnixPciDriver.h"
 #include "PmcCfg.h"
 #include "PmcData.h"
 
@@ -52,13 +52,13 @@ static const char* INVALID = "Invalid";
 
 using namespace std;
 
-UnixDriverAPI::~UnixDriverAPI()
+UnixPciDriver::~UnixPciDriver()
 {
     Close();
 }
 
 // Base access functions (to be implemented by specific device)
-bool UnixDriverAPI::Read(DWORD address, DWORD& value)
+bool UnixPciDriver::Read(DWORD address, DWORD& value)
 {
     IoctlIO io;
 
@@ -75,7 +75,7 @@ bool UnixDriverAPI::Read(DWORD address, DWORD& value)
     return true;
 }
 
-bool UnixDriverAPI::ReadBlock(DWORD addr, DWORD blockSize, char *arrBlock)
+bool UnixPciDriver::ReadBlock(DWORD addr, DWORD blockSize, char *arrBlock)
 {
     IoctlIOBlock io;
     io.op = EP_OPERATION_READ;
@@ -86,7 +86,34 @@ bool UnixDriverAPI::ReadBlock(DWORD addr, DWORD blockSize, char *arrBlock)
     return SendRWBIoctl(io, m_fileDescriptor, m_interfaceName.c_str());
 }
 
-bool UnixDriverAPI::Write(DWORD address, DWORD value)
+bool UnixPciDriver::ReadBlock(DWORD address, DWORD blockSize, vector<DWORD>& values)
+{
+    bool success = false;
+
+    DWORD* arrBlock = NULL;
+    try
+    {
+        arrBlock = new DWORD[blockSize];
+
+        // blockSize is in bytes, need to be multiplied by 4 for DWORDS
+        success = ReadBlock(address, blockSize * 4, (char*)arrBlock);
+
+        values = std::vector<DWORD>(arrBlock, arrBlock + (blockSize));
+
+        LOG_DEBUG << "Read: " << values.size() << " Values \n";
+    }
+    catch (...)
+    {
+        LOG_ERROR << "Exception when trying to read block\n";
+        delete[] arrBlock;
+        return false;
+    }
+
+    delete[] arrBlock;
+    return success;
+}
+
+bool UnixPciDriver::Write(DWORD address, DWORD value)
 {
     IoctlIO io;
 
@@ -101,21 +128,21 @@ bool UnixDriverAPI::Write(DWORD address, DWORD value)
 
     return true;
 }
-bool UnixDriverAPI::WriteBlock(DWORD addr, DWORD blockSize, const char *arrBlock)
+bool UnixPciDriver::WriteBlock(DWORD addr, vector<DWORD> values)
 {
-    //blocks must be 32bit alligned!
-    int sizeToWrite = (blockSize / 4) * 4;
+    char* valuesToWrite = (char*)&values[0];
+    int sizeToWrite = values.size() * 4;
 
     IoctlIOBlock io;
     io.op = EP_OPERATION_WRITE;
     io.addr = addr;
     io.size = sizeToWrite;
-    io.buf = (void*)arrBlock;
+    io.buf = (void*)valuesToWrite;
 
     return SendRWBIoctl(io, m_fileDescriptor, m_interfaceName.c_str());
 }
 
-bool UnixDriverAPI::IsOpened(void)
+bool UnixPciDriver::IsOpened(void)
 {
     return m_initialized;
 }
@@ -182,14 +209,25 @@ set<string> GetNetworkInterfaceNames()
     return networkInterfaces;
 }
 
-set<string> UnixDriverAPI::Enumerate()
+set<string> UnixPciDriver::Enumerate()
 {
-    set<string> interfaces = GetNetworkInterfaceNames();
+    set<string> interfacesToCheck = GetNetworkInterfaceNames();
+    set<string> connectedInterfaces;
+    for (auto it = interfacesToCheck.begin(); it != interfacesToCheck.end(); ++it)
+    {
+        string interfaceName = *it;
 
-    return interfaces;
+        UnixPciDriver pciDriver(interfaceName);
+        if (pciDriver.Open())
+        {
+            connectedInterfaces.insert(UnixPciDriver::NameDevice(interfaceName));
+            pciDriver.Close();
+        }
+    }
+    return connectedInterfaces;
 }
 
-bool UnixDriverAPI::Open()
+bool UnixPciDriver::Open()
 {
     if(IsOpened())
     {
@@ -219,7 +257,7 @@ bool UnixDriverAPI::Open()
     return true;
 }
 
-bool UnixDriverAPI::SetDebugFsPath() // assuming m_interfaceName is set
+bool UnixPciDriver::SetDebugFsPath() // assuming m_interfaceName is set
 {
     // const definitions
     static const char* PHY = "phy";
@@ -258,17 +296,17 @@ bool UnixDriverAPI::SetDebugFsPath() // assuming m_interfaceName is set
     return true;
 }
 
-bool UnixDriverAPI::ReOpen()
+bool UnixPciDriver::ReOpen()
 {
     return Open();
 }
 
-bool UnixDriverAPI::InternalOpen()
+bool UnixPciDriver::InternalOpen()
 {
     return true;
 }
 
-DWORD UnixDriverAPI::DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DWORD DebugFSFlags)
+DWORD UnixPciDriver::DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DWORD DebugFSFlags)
 {
     //do something with params
     (void)FileName;
@@ -278,7 +316,7 @@ DWORD UnixDriverAPI::DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DW
     return 0;
 }
 
-bool UnixDriverAPI::AllocPmc(unsigned descSize, unsigned descNum, string& outMessage)
+bool UnixPciDriver::AllocPmc(unsigned descSize, unsigned descNum, string& outMessage)
 {
     PmcCfg pmcCfg(m_debugFsPath.c_str());
     OperationStatus st = pmcCfg.AllocateDmaDescriptors(descSize, descNum);
@@ -287,7 +325,7 @@ bool UnixDriverAPI::AllocPmc(unsigned descSize, unsigned descNum, string& outMes
     return st.IsSuccess();
 }
 
-bool UnixDriverAPI::DeallocPmc(std::string& outMessage)
+bool UnixPciDriver::DeallocPmc(std::string& outMessage)
 {
     PmcCfg pmcCfg(m_debugFsPath.c_str());
     OperationStatus st = pmcCfg.FreeDmaDescriptors();
@@ -296,7 +334,7 @@ bool UnixDriverAPI::DeallocPmc(std::string& outMessage)
     return st.IsSuccess();
 }
 
-bool UnixDriverAPI::CreatePmcFile(unsigned refNumber, std::string& outMessage)
+bool UnixPciDriver::CreatePmcFile(unsigned refNumber, std::string& outMessage)
 {
     LOG_DEBUG << "Creating PMC data file #" << refNumber << std::endl;
 
@@ -315,7 +353,7 @@ bool UnixDriverAPI::CreatePmcFile(unsigned refNumber, std::string& outMessage)
     return true;
 }
 
-bool UnixDriverAPI::FindPmcFile(unsigned refNumber, std::string& outMessage)
+bool UnixPciDriver::FindPmcFile(unsigned refNumber, std::string& outMessage)
 {
     LOG_DEBUG << "Looking for the PMC File #" << refNumber << endl;
 
@@ -333,7 +371,7 @@ bool UnixDriverAPI::FindPmcFile(unsigned refNumber, std::string& outMessage)
     return true;
 }
 
-void UnixDriverAPI::Close()
+void UnixPciDriver::Close()
 {
     if (m_fileDescriptor != INVALID_FD)
     {
@@ -342,14 +380,14 @@ void UnixDriverAPI::Close()
     }
 }
 
-int UnixDriverAPI::GetDriverMode(int &currentState)
+int UnixPciDriver::GetDriverMode(int &currentState)
 {
     //do something with params
     (void)currentState;
 
     return 0;
 }
-bool UnixDriverAPI::SetDriverMode(int newState, int &oldState)
+bool UnixPciDriver::SetDriverMode(int newState, int &oldState)
 {
     //do something with params
     (void)newState;
@@ -357,12 +395,12 @@ bool UnixDriverAPI::SetDriverMode(int newState, int &oldState)
     return false;
 }
 
-void UnixDriverAPI::Reset()
+void UnixPciDriver::Reset()
 {
     return;
 }
 
-bool UnixDriverAPI::DriverControl(uint32_t Id,
+bool UnixPciDriver::DriverControl(uint32_t Id,
     const void *inBuf, uint32_t inBufSize,
     void *outBuf, uint32_t outBufSize)
 {
@@ -375,7 +413,7 @@ bool UnixDriverAPI::DriverControl(uint32_t Id,
     return false;
 }
 
-bool UnixDriverAPI::SendRWIoctl(IoctlIO & io, int fd, const char* interfaceName)
+bool UnixPciDriver::SendRWIoctl(IoctlIO & io, int fd, const char* interfaceName)
 {
     int ret;
     struct ifreq ifr;
@@ -393,7 +431,7 @@ bool UnixDriverAPI::SendRWIoctl(IoctlIO & io, int fd, const char* interfaceName)
     return true;
 }
 
-bool UnixDriverAPI::SendRWBIoctl(IoctlIOBlock & io, int fd, const char* interfaceName)
+bool UnixPciDriver::SendRWBIoctl(IoctlIOBlock & io, int fd, const char* interfaceName)
 {
     int ret;
     struct ifreq ifr;
@@ -412,7 +450,7 @@ bool UnixDriverAPI::SendRWBIoctl(IoctlIOBlock & io, int fd, const char* interfac
 }
 
 // Receives interface name (wigig#, wlan#) and checks if it is responding
-bool UnixDriverAPI::ValidateInterface()
+bool UnixPciDriver::ValidateInterface()
 {
     IoctlIO io;
     io.addr = 0x880050; //baud rate
@@ -426,4 +464,10 @@ bool UnixDriverAPI::ValidateInterface()
     return false;
 }
 
+string UnixPciDriver::NameDevice(string interfaceName)
+{
+    stringstream ss;
+    ss << Utils::PCI << DEVICE_NAME_DELIMITER << interfaceName;
+    return ss.str();
+}
 #endif // ifndef _WINDOWS

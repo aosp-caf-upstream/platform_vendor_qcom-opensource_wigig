@@ -34,13 +34,18 @@
 #include <cstdlib>
 #include <algorithm>
 
-
-#ifdef __linux
-#else
+#if _WINDOWS
 #define localtime_r(_Time, _Tm) localtime_s(_Tm, _Time)
 #endif
 
 using namespace std;
+
+const unsigned int Utils::REGISTER_DEFAULT_VALUE = 0xDEADDEAD;
+
+const string Utils::PCI = "PCI";
+const string Utils::JTAG = "JTAG";
+const string Utils::SERIAL = "SERIAL";
+const string Utils::DUMMY = "DUMMY";
 
 // *************************************************************************************************
 vector<string> Utils::Split(string str, char delimiter)

@@ -30,7 +30,9 @@
 #ifndef _HOST_H_
 #define _HOST_H_
 
-//#include "Server.h"
+#include <memory>
+#include <future>
+#include "EventsDefinitions.h"
 #include "CommandsTcpServer.h"
 #include "EventsTcpServer.h"
 #include "CommandsHandler.h"
@@ -55,7 +57,6 @@ public:
         return host;
     }
 
-
     /*
      * StratHost starts each one of the servers it holds
      */
@@ -70,13 +71,25 @@ public:
 
     DeviceManager& GetDeviceManager() { return m_deviceManager;  }
 
+    // Push the given event through Events TCP Server
+    void PushEvent(const HostManagerEventBase& event) const;
+
+    // delete copy Cnstr and assignment operator
+    // keep public for better error message
+    // no move members will be declared implicitly
+    Host(const Host&) = delete;
+    Host& operator=(const Host&) = delete;
 
 private:
-    shared_ptr<CommandsTcpServer> m_pCommandsTcpServer;
-    shared_ptr<EventsTcpServer> m_pEventsTcpServer;
-    shared_ptr<UdpServer> m_pUdpServer;
+    std::shared_ptr<CommandsTcpServer> m_pCommandsTcpServer;
+    std::shared_ptr<EventsTcpServer> m_pEventsTcpServer;
+    std::shared_ptr<UdpServer> m_pUdpServer;
     HostInfo m_hostInfo;
-    DeviceManager m_deviceManager;
+    std::promise<void> m_eventsTCPServerReadyPromise;    // sync. of device manager with events TCP server creation
+    DeviceManager m_deviceManager;                        // note: it should be defined after the promise passsed to its Cnstr
+
+    // define Cnstr to be private, part of Singleton pattern
+    Host();
 };
 
 

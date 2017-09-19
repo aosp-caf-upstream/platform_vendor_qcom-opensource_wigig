@@ -113,7 +113,6 @@ NetworkInterface NetworkInterface::Accept()
         LOG_ERROR << "Cannot accept incoming connection: " << strerror(errno) << std::endl;
         exit(1);
     }
-
     return NetworkInterface(fileDescriptor);
 }
 
@@ -179,9 +178,9 @@ const char* NetworkInterface::Receive(int size, int flags)
     if (m_bufferSize <= size + 1)
     {
         m_buffer = (char*)(realloc(m_buffer, sizeof(char) * (size + 1)));
-        if (m_buffer == NULL)
+        if (m_buffer == nullptr)
         {
-            return NULL;
+            return nullptr;
         }
         m_bufferSize = size;
     }
@@ -192,15 +191,14 @@ const char* NetworkInterface::Receive(int size, int flags)
     if (-1 == bytesReceived)
     {
         LOG_ERROR << "Error while receiving from a TCP socket: " << strerror(errno) << std::endl;
-        return NULL;
+        return nullptr;
     }
-	if (0 == bytesReceived)
-	{
-		LOG_INFO << "Connection closed by peer " << m_peerName << std::endl;
-		return NULL;
-	}
+    if (0 == bytesReceived)
+    {
+        LOG_INFO << "Connection closed by peer " << m_peerName << std::endl;
+        return nullptr;
+    }
     m_buffer[bytesReceived] = '\0';
-
     return m_buffer;
 }
 
@@ -211,11 +209,26 @@ const char* NetworkInterface::BinaryReceive(int size, int flags)
     if (m_bufferSize <= size)
     {
         m_buffer = (char*)(realloc(m_buffer, sizeof(char) * size));
+        if (m_buffer == nullptr)
+        {
+            return nullptr;
+        }
         m_bufferSize = size;
     }
 
+    memset(m_buffer, 0, m_bufferSize);
+
     int bytesReceived = recv(m_fileDescriptor, m_buffer, size, flags);
-    m_buffer[bytesReceived] = '\0';
+    if (-1 == bytesReceived)
+    {
+        LOG_ERROR << "Error while receiving from a TCP socket: " << strerror(errno) << std::endl;
+        return nullptr;
+    }
+    if (0 == bytesReceived)
+    {
+        LOG_INFO << "Connection closed by peer " << m_peerName << std::endl;
+        return nullptr;
+    }
 
     return m_buffer;
 }
@@ -228,8 +241,10 @@ void NetworkInterface::Close()
 #ifdef _WINDOWS
     WSACleanup();
     closesocket(m_fileDescriptor);
-#else
+#elif __linux
     close(m_fileDescriptor);
+#else
+    shutdown(m_fileDescriptor, SHUT_RDWR);
 #endif
 }
 

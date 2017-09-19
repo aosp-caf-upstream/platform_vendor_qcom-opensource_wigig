@@ -28,33 +28,28 @@
  */
 
 #include <sstream>
-
 #include "AccessLayerAPI.h"
-
-#ifdef _WINDOWS
-#include "JTagDevice.h"
-#include "SerialDevice.h"
-#endif
-#include "TestDevice.h"
-
-#include "PciDevice.h"
+#include "DriverFactory.h"
 #include "../Utils.h"
 
 using namespace std;
 
-set<string> AccessLayer::GetDevices()
+set<string> AccessLayer::GetDrivers()
 {
     set<string> enumeratedDevices;
 
     // Enumerate
-    set<string> pciDevices = PciDevice::Enumerate();
 
 #ifdef _WINDOWS
-    set<string> jtagDevices = JTagDevice::Enumerate();
+    set<string> pciDevices = WindowsDriverAPI::Enumerate();
+    set<string> jtagDevices = JTagDriver::Enumerate();
     enumeratedDevices.insert(jtagDevices.begin(), jtagDevices.end());
-
     //set<string> serialDevices = SerialDevice::Enumerate();
     //enumeratedDevices.insert(serialDevices.begin(), serialDevices.end());
+#elif __OS3__
+    set<string> pciDevices = OS3DriverAPI::Enumerate();
+#else
+    set<string> pciDevices = UnixPciDriver::Enumerate();
 #endif
 
     enumeratedDevices.insert(pciDevices.begin(), pciDevices.end());
@@ -66,7 +61,7 @@ set<string> AccessLayer::GetDevices()
     return enumeratedDevices;
 }
 
-unique_ptr<Device> AccessLayer::OpenDevice(string deviceName)
+unique_ptr<DriverAPI> AccessLayer::OpenDriver(string deviceName)
 {
     vector<string> tokens = Utils::Split(deviceName, DEVICE_NAME_DELIMITER);
 
@@ -81,32 +76,38 @@ unique_ptr<Device> AccessLayer::OpenDevice(string deviceName)
     }
 
     // Transport type
-    unique_ptr<Device> pDevice;
+    unique_ptr<DriverAPI> pDevice;
 
-    if ("PCI" == tokens[0])
+    if (Utils::PCI == tokens[0])
     {
-        pDevice.reset(new PciDevice(deviceName, tokens[1]));
+        pDevice = DriverFactory::GetDriver(PCI, tokens[1]);
     }
 
 #ifdef _WINDOWS
-    if ("JTAG" == tokens[0])
+    if (Utils::JTAG == tokens[0])
     {
-        pDevice.reset(new JTagDevice(deviceName, tokens[1]));
+        pDevice = DriverFactory::GetDriver(JTAG, tokens[1]);
     }
 
-    if ("SERIAL" == tokens[0])
+    if (Utils::SERIAL == tokens[0])
     {
-        pDevice.reset(new SerialDevice(deviceName, tokens[1]));
+        pDevice = DriverFactory::GetDriver(SERIAL, tokens[1]);
     }
 #endif
 
-#ifdef _UseTestDevice
-    if ("TEST" == tokens[0])
+#ifdef _UseDummyDevice
+    if (Utils::DUMMY == tokens[0])
     {
-        pDevice.reset(new TestDevice(deviceName, tokens[1]));
+        pDevice = DriverFactory::GetDriver(DUMMY, tokens[1]);
     }
 #endif // _UseOnlyTestDevice
 
-
+    if (NULL != pDevice.get())
+    {
+        if (!pDevice->Open())
+        {
+            LOG_ERROR << ": Failed to open interface" << endl;
+        }
+    }
     return pDevice;
 }

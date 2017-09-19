@@ -48,6 +48,8 @@ int main(int argc, char* argv[])
 {
     try
     {
+        LOG_INFO << "Host Manager 11ad version: " << HostInfo::GetVersion() << endl;
+
         unsigned int commandsTcpPort = DEFAULT_COMMANDS_TCP_SERVER_PORT;
         unsigned int eventsTcpPort = DEFAULT_EVENTS_TCP_SERVER_PORT;
         unsigned int udpPortIn = DEFAULT_UDP_SERVER_PORT_IN_GET_MESSAGE;
@@ -55,17 +57,21 @@ int main(int argc, char* argv[])
 
         unique_ptr<ArgumentsParser> pArgumentsParser(new ArgumentsParser());
         //support to change by the user the commands TCP port only,events Tcp port UDP ports are not changeable by the user
-        pArgumentsParser->ParseAndHandleArguments(argc, argv, commandsTcpPort);
+        bool continueRunningHostManager = pArgumentsParser->ParseAndHandleArguments(argc, argv, commandsTcpPort);
 
-        //Handle OS specific configurations
-        unique_ptr<OsHandler> pOsHandler(new OsHandler());
-        pOsHandler->HandleOsSignals();
+        if (continueRunningHostManager)
+        {
+            //Handle OS specific configurations
+            unique_ptr<OsHandler> pOsHandler(new OsHandler());
+            pOsHandler->HandleOsSignals();
 
-        //Start Host object
-        LOG_INFO << "Starting Host Manager" << endl;
-        Host::GetHost().StartHost(commandsTcpPort, eventsTcpPort, udpPortIn, udpPortOut);
+            //Start Host object
+            LOG_INFO << "Starting Host Manager" << endl;
+            Host::GetHost().StartHost(commandsTcpPort, eventsTcpPort, udpPortIn, udpPortOut);
 
-        LOG_INFO << "Stopping host_manager_11ad" << endl;
+            LOG_INFO << "Stopping host_manager_11ad" << endl;
+        }
+
     }
     catch (exception& e)
     {

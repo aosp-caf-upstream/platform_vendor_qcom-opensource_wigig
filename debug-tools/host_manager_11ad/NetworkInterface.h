@@ -51,7 +51,10 @@
 #include <arpa/inet.h>
 #include <sys/wait.h>
 #else
-
+#include <sys/socket.h>
+#include <net/route.h>
+#include <net/if.h>
+#include <arpa/inet.h>
 #endif
 
 #ifdef _WINDOWS

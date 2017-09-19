@@ -49,9 +49,8 @@ void EventsTcpServer::Start()
             NetworkInterfaces::NetworkInterface newClient = m_pSocket->Accept();
             //LOG_INFO << "Adding a new client to the Events TCP Server: " << newClient.getPeerName() << endl;
             //using unique_lock promises that in case of exception the mutex is unlocked:
-            unique_lock<mutex> clientsVectorLock(clientsVectorMutex);
-            clientsVector.push_back(newClient);
-            clientsVectorLock.unlock();
+            lock_guard<mutex> clientsVectorLock(m_clientsVectorMutex);
+            m_clientsVector.push_back(newClient);
         }
         catch (exception e)
         {
@@ -60,13 +59,13 @@ void EventsTcpServer::Start()
     }
 }
 
-bool EventsTcpServer::SendToAllConnectedClients(string message)
+bool EventsTcpServer::SendToAllConnectedClients(const string& message)
 {
     try
     {
-        //using unique_lock promises that in case of exception the mutex is unlocked:
-        unique_lock<mutex> clientsVectorLock(clientsVectorMutex); //locks the mutex in for loop because it iterates on clientsVector
-        for (auto client = clientsVector.begin(); client != clientsVector.end(); )
+        //using lock_guard promises that in case of exception the mutex is unlocked:
+        lock_guard<mutex> clientsVectorLock(m_clientsVectorMutex); //locks the mutex because the for loop iterates on clientsVector
+        for (auto client = m_clientsVector.begin(); client != m_clientsVector.end(); )
         {
             try
             {
@@ -74,7 +73,7 @@ bool EventsTcpServer::SendToAllConnectedClients(string message)
                 if (bytesSent == 0)
                 { //it means the client had disconnected, remove the client from the clients list
                     LOG_WARNING << "Client: " << (*client).GetPeerName() << " has disconnected, removing from the clients list" << endl;
-                    client = clientsVector.erase(client);
+                    client = m_clientsVector.erase(client);
                 }
                 else
                 {
@@ -84,7 +83,7 @@ bool EventsTcpServer::SendToAllConnectedClients(string message)
             catch (exception e)
             {
                 string peerName = "Unknown client";
-                if (client != clientsVector.end())
+                if (client != m_clientsVector.end())
                 {
                     peerName = (*client).GetPeerName();
                 }
@@ -92,7 +91,6 @@ bool EventsTcpServer::SendToAllConnectedClients(string message)
 
             }
         }
-        clientsVectorLock.unlock(); //unlock the mutex on the for loop
     }
     catch (exception e)
     {

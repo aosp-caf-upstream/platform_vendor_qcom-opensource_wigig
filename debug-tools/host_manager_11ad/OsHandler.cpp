@@ -30,13 +30,16 @@
 #include "OsHandler.h"
 #include <memory>
 #include <iostream> //TODO - maybe to remove
+#ifdef __OS3__
+#include <sys/signal.h>
+#endif
 #include "Host.h"
 using namespace std; //TODO - maybe to remove
 
-#ifdef __linux
+#ifndef _WINDOWS
 void sig_quit_handler(int signum)
 {
-    if (signum == SIGQUIT)
+    if (signum == SIGQUIT || signum == SIGTSTP)
     {
         printf("Exiting host_manager_11ad as per user request\n");
         Host::GetHost().StopHost();
@@ -47,17 +50,17 @@ void sig_quit_handler(int signum)
         //printf("Connection lost\n");
     }
 }
-#endif // __linux
-
+#endif
 
 // *************************************************************************************************
 
 void OsHandler::HandleOsSignals()
 {
-#ifdef __linux
+#ifndef _WINDOWS
     //LOG_INFO << "Handle linux SIQQUIT signal" << endl;
     signal(SIGQUIT, sig_quit_handler);
     signal(SIGPIPE, sig_quit_handler);
-#endif // __linux
+    signal(SIGTSTP, sig_quit_handler);
+#endif
 
 }

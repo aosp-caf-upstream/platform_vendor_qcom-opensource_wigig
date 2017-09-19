@@ -45,8 +45,15 @@
 #include <dirent.h>
 #include <stdio.h>
 
-#else
+#elif _WINDOWS
 #include <windows.h>
+
+#else
+#include <dirent.h>
+#include <sys/socket.h>
+#include <net/route.h>
+#include <net/if.h>
+#include <arpa/inet.h>
 #endif
 
 #include <iostream>
@@ -171,6 +178,8 @@ string UdpTempOsAbstruction::GetPersistencyLocation()
 {
 #ifdef __linux
     return "/etc/";
+#elif __OS3__
+    return "/tmp/";
 #else
     return "C:\\Temp\\"; // TODO: change
 #endif // __linux
@@ -178,7 +187,7 @@ string UdpTempOsAbstruction::GetPersistencyLocation()
 
 string UdpTempOsAbstruction::GetDirectoriesDilimeter()
 {
-#ifdef __linux
+#ifndef _WINDOWS
     return "/";
 #else
     return "\\";
@@ -202,7 +211,7 @@ bool UdpTempOsAbstruction::ReadHostOsAlias(string& alias)
 
 bool UdpTempOsAbstruction::IsFolderExists(string path)
 {
-#ifdef __linux
+#ifndef _WINDOWS
     DIR* pDir = opendir(path.c_str());
     if (pDir != NULL)
     {
@@ -232,7 +241,7 @@ bool UdpTempOsAbstruction::IsFileExists(string path)
 
 bool UdpTempOsAbstruction::CreateFolder(string path)
 {
-#ifdef __linux
+#ifndef _WINDOWS
     system(("mkdir " + path).c_str());
     return true;
 #else
@@ -243,7 +252,7 @@ bool UdpTempOsAbstruction::CreateFolder(string path)
 
 void UdpTempOsAbstruction::MoveFileToNewLocation(string oldFileLocation, string newFileLocation)
 {
-#ifdef __linux
+#ifndef _WINDOWS
     system(("mv " + oldFileLocation + " " + newFileLocation).c_str());
 #else
     // not Implemented yet
@@ -255,8 +264,7 @@ UdpSocket::UdpSocket(string broadcastIp, int portIn, int portOut)
     m_portIn = portIn;
     m_portOut = portOut;
     m_broadcastIp = broadcastIp;
-#ifdef __linux
-
+#ifndef _WINDOWS
     // create UDP socket
     m_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (m_socket < 0)
@@ -299,7 +307,7 @@ UdpSocket::UdpSocket(string broadcastIp, int portIn, int portOut)
 
 int UdpSocket::Send(string message)
 {
-#ifdef __linux
+#ifndef _WINDOWS
     struct sockaddr_in dstAddress;
     dstAddress.sin_family = AF_INET;
     inet_pton(AF_INET, m_broadcastIp.c_str(), &dstAddress.sin_addr.s_addr);
@@ -320,7 +328,7 @@ int UdpSocket::Send(string message)
 
 const char* UdpSocket::Receive(int len)
 {
-#ifdef __linux
+#ifndef _WINDOWS
     char* buf = new char[len];
     if (recvfrom(m_socket, buf, len, 0, NULL, 0) < 0)
     {
@@ -335,8 +343,7 @@ const char* UdpSocket::Receive(int len)
 
 void UdpSocket::Close()
 {
-#ifdef __linux
+#ifndef _WINDOWS
     shutdown(m_socket, SHUT_RDWR);
-#else
 #endif
 }

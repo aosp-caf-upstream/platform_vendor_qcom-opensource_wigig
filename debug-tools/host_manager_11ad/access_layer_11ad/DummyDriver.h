@@ -27,19 +27,19 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _11AD_TEST_DEVICE_H_
-#define _11AD_TEST_DEVICE_H_
+#ifndef _11AD_DUMMY_DRIVER_H_
+#define _11AD_DUMMY_DRIVER_H_
 
 #include <map>
-#include "Device.h"
+#include "DriverAPI.h"
 
 using namespace std;
 
-class TestDevice : public Device
+class DummyDriver : public DriverAPI
 {
 public:
-    TestDevice(string deviceName, string interfaceName);
-    ~TestDevice();
+    DummyDriver(string interfaceName);
+    ~DummyDriver();
 
     // Device Management
     bool Open();
@@ -54,9 +54,25 @@ public:
     virtual void InterfaceReset();
     bool SwReset();
 
+    // PMC functions
+    virtual bool AllocPmc(unsigned descSize, unsigned descNum, std::string& outMessage) { return false; };
+    virtual bool DeallocPmc(std::string& outMessage) { return false; };
+    virtual bool CreatePmcFile(unsigned refNumber, std::string& outMessage) { return false; };
+    virtual bool FindPmcFile(unsigned refNumber, std::string& outMessage) { return false; };
+
+    virtual bool IsOpened(void) { return false; };
+    virtual bool ReOpen() { return false; };
+    virtual bool DriverControl(uint32_t Id, const void *inBuf, uint32_t inBufSize, void *outBuf, uint32_t outBufSize) { return false; };
+    virtual DWORD DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DWORD DebugFSFlags) { return -1; };
+
+    virtual int GetDriverMode(int &currentState) { return 0; };
+    virtual bool SetDriverMode(int newState, int &oldState) { return false; };
+
+    virtual void Reset() { return; };
+
     static set<string> Enumerate();
 
 private:
     map<DWORD, DWORD> m_registersAddressToValue;
 };
-#endif //_11AD_TEST_DEVICE_H_
+#endif //_11AD_DUMMY_DRIVER_H_

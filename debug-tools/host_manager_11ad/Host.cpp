@@ -36,6 +36,11 @@
 
 using namespace std;
 
+// The private singleton Cntr
+// Note: the promise is defined before device manager field
+Host::Host() : m_deviceManager(m_eventsTCPServerReadyPromise)
+{}
+
 void Host::StartHost(unsigned int commandsTcpPort, unsigned int eventsTcpPort, unsigned int udpPortIn, unsigned int udpPortOut)
 {
     m_pCommandsTcpServer.reset(new CommandsTcpServer(commandsTcpPort, *this));
@@ -65,12 +70,12 @@ void Host::StartHost(unsigned int commandsTcpPort, unsigned int eventsTcpPort, u
         LOG_ERROR << "Couldn't set new socket for the events TCP server" << endl;
         throw "Couldn't set new socket for the events TCP server";
     }
+    m_eventsTCPServerReadyPromise.set_value(); // notify device manager - OK to push events
 
     thread threadEventsTcpServer;
     try
     {
         LOG_INFO << "Starting events TCP server on port " << eventsTcpPort << endl;
-        //threadEventsTcpServer = thread(&EventsTcpServer::Start, m_pEventsTcpServer);
         threadEventsTcpServer = thread(&EventsTcpServer::Start, m_pEventsTcpServer.get());
     }
     catch (exception e)
@@ -109,4 +114,18 @@ void Host::StopHost()
     m_pCommandsTcpServer->Stop();
     m_pEventsTcpServer->Stop();
     m_pUdpServer->Stop();
+}
+
+// Push the given event through Events TCP Server
+void Host::PushEvent(const HostManagerEventBase& event) const
+{
+    if (!m_pEventsTcpServer)
+    {    // shouldn't happen
+        LOG_ERROR << "Host::PushEvent: Events TCP Server is not ready!" << endl;
+        return;
+    }
+
+    std::stringstream os;
+    event.ToJson(os);
+    m_pEventsTcpServer->SendToAllConnectedClients(os.str());
 }

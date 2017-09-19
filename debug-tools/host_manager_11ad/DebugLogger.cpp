@@ -38,10 +38,18 @@ LogConfig g_LogConfig(LOG_SEV_INFO, false);
 
 LogConfig::LogConfig(LogSeverity maxSeverity, bool bPrintLocation)
     : m_MaxSeverity(maxSeverity)
+    , m_ShowStatusBar(false)
     , m_PrintLocation(bPrintLocation)
     , m_ExitOnAssert(false)
 {
 }
+
+void LogConfig::SetStatusBarPrinter(bool statusBarShow)
+{
+    m_ShowStatusBar = statusBarShow;
+    std::cout << "m_ShowStatusBar is " << m_ShowStatusBar << std::endl;
+}
+
 
 void LogConfig::SetMaxSeverity(int traceLevel)
 {

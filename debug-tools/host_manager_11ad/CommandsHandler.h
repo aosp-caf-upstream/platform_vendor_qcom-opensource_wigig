@@ -179,6 +179,8 @@ private:
     */
     ResponseMessage SetHostAlias(vector<string> arguments, unsigned int numberOfArguments);
 
+    ResponseMessage GetHostAlias(vector<string> arguments, unsigned int numberOfArguments);
+
     const char m_device_delimiter = ' ';
 
     const char m_array_delimiter = ' ';

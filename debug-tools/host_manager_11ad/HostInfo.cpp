@@ -32,11 +32,11 @@
 #include "UdpTempOsAbstruction.h"
 #include <iostream>
 
-const string HostInfo::s_version = "1.1.2";
+const string HostInfo::s_version = "1.1.3";
 
 HostInfo::HostInfo() :
     m_alias(""),
-    m_persistencyPath(UdpTempOsAbstruction::GetPersistencyLocation() + "host_manager_11ad"),
+    m_persistencyPath(UdpTempOsAbstruction::GetPersistencyLocation() + "host_manager_11ad_host_info"),
     m_aliasFileName(UdpTempOsAbstruction::GetDirectoriesDilimeter() + "host_alias"),
     m_oldHostAliasFile(UdpTempOsAbstruction::GetPersistencyLocation() + "wigig_remoteserver_details"),
     m_isAliasFileChanged(false)

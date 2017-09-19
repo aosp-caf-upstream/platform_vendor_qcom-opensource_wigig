@@ -32,6 +32,7 @@
 
 #define BAUD_RATE_REGISTER 0x880050
 
+
 typedef enum BasebandTypeEnum
 {
     BASEBAND_TYPE_NONE,
@@ -40,6 +41,14 @@ typedef enum BasebandTypeEnum
     BASEBAND_TYPE_TALYN,
     BASEBAND_TYPE_LAST
 } BasebandType;
+
+enum DeviceType
+{
+    PCI,
+    JTAG,
+    SERIAL,
+    DUMMY
+};
 
 #define EMPTY_ARRAY_SIZE
 

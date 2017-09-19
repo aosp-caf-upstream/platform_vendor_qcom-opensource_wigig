@@ -27,8 +27,8 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _11AD_PCI_UNIX_DRIVER_API_H_
-#define _11AD_PCI_UNIX_DRIVER_API_H_
+#ifndef _11AD_PCI_UNIX_PCI_DRIVER_H_
+#define _11AD_PCI_UNIX_PCI_DRIVER_H_
 
 
 #ifndef _WINDOWS
@@ -39,7 +39,7 @@
 
 using namespace std;
 
-class UnixDriverAPI : public DriverAPI
+class UnixPciDriver : public DriverAPI
 {
     typedef struct
     {
@@ -80,25 +80,25 @@ class UnixDriverAPI : public DriverAPI
         uint32_t val;
     } IoctlIO;
 
-    typedef	struct {
+    typedef    struct {
         uint32_t op;
-		uint32_t addr; /* should be 32-bit aligned */
-		uint32_t size; /* represents the size in bytes. should be multiple of 4 */
-		void* buf; /* block address */
-	} IoctlIOBlock;
+        uint32_t addr; /* should be 32-bit aligned */
+        uint32_t size; /* represents the size in bytes. should be multiple of 4 */
+        void* buf; /* block address */
+    } IoctlIOBlock;
 
 public:
-    UnixDriverAPI(string interfaceName) : DriverAPI(interfaceName)
+    UnixPciDriver(string interfaceName) : DriverAPI(interfaceName)
     {
         m_initialized = false;
     }
-    ~UnixDriverAPI();
+    ~UnixPciDriver();
 
     // Base access functions (to be implemented by specific device)
     bool Read(DWORD address, DWORD& value);
     bool ReadBlock(DWORD addr, DWORD blockSize, char *arrBlock); // blockSize is the size in bytes
     bool Write(DWORD address, DWORD value);
-    bool WriteBlock(DWORD addr, DWORD blockSize, const char *arrBlock);
+    bool WriteBlock(DWORD addr, vector<DWORD> values);
 
     bool IsOpened(void);
 
@@ -130,6 +130,8 @@ private:
     bool SendRWBIoctl(IoctlIOBlock & io, int fd, const char* interfaceName);
     bool ValidateInterface();
     bool SetDebugFsPath();
+    bool ReadBlock(DWORD address, DWORD blockSize, vector<DWORD>& values);
+    static string NameDevice(string interfaceName);
 
     bool m_initialized;
 
@@ -140,4 +142,4 @@ private:
 
 #endif // ifndef _WINDOWS
 
-#endif //_11AD_PCI_UNIX_DRIVER_API_H_
+#endif //_11AD_PCI_UNIX_PCI_DRIVER_H_
