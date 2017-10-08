@@ -709,18 +709,16 @@ WLCTPCIACSS_API int InterfaceReset(void* pDeviceAccss)
 */
 WLCTPCIACSS_API void hwCopyFromIO( void* dst, void* pDeviceAccss, DWORD src, UINT32 len)
 {
-	UINT32 i, regCount;
-	DWORD readVal;
+	const size_t regSizeInBytes = 4;
+	UINT32 regCount = (len + regSizeInBytes - 1) / regSizeInBytes;
+	std::vector<DWORD> readBuffer(regCount);
 
-	regCount = (UINT64)(ALIGN_UP_BY(len, 4)) / 4;
-
-	for (i = 0; i < regCount; ++i)
+	for (size_t i = 0U; i < readBuffer.size(); ++i)
 	{
-		//*((PUINT32)dst + i) = READ32((PUINT32)src + i);
-		int res = ((IDeviceAccess*)pDeviceAccss)->r32(src + i, readVal);
-                (void)res;
-		*((PUINT32)dst + i) = readVal;
+		((IDeviceAccess*)pDeviceAccss)->r32(src + i, readBuffer[i]);
 	}
+
+	memcpy(dst, &readBuffer[0], len);
 }
 
 WLCTPCIACSS_API int WlctAccssWrite(void* pDeviceAccss, DWORD addr, DWORD val)
