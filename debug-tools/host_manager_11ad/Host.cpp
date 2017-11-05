@@ -38,10 +38,10 @@ using namespace std;
 
 // The private singleton Cntr
 // Note: the promise is defined before device manager field
-Host::Host() : m_deviceManager(m_eventsTCPServerReadyPromise)
+Host::Host() : m_deviceManager(m_eventsTCPServerReadyPromise), m_MenuDisplayOn(false)
 {}
 
-void Host::StartHost(unsigned int commandsTcpPort, unsigned int eventsTcpPort, unsigned int udpPortIn, unsigned int udpPortOut)
+void Host::StartHost(unsigned int commandsTcpPort, unsigned int eventsTcpPort, unsigned int udpPortIn, unsigned int udpPortOut, unsigned int httpPort)
 {
     m_pCommandsTcpServer.reset(new CommandsTcpServer(commandsTcpPort, *this));
 
@@ -103,10 +103,15 @@ void Host::StartHost(unsigned int commandsTcpPort, unsigned int eventsTcpPort, u
         throw "Couldn't start UDP server thread";
     }
 
+    // If user requested to display menu & user hasn't exited the menu
+    while (m_MenuDisplayOn)
+    {
+        DisplayMenu();
+    }
+
     threadCommandsTcpServer.join();
     threadEventsTcpServer.join();
     threadUdpServer.join();
-
 }
 
 void Host::StopHost()
@@ -128,4 +133,70 @@ void Host::PushEvent(const HostManagerEventBase& event) const
     std::stringstream os;
     event.ToJson(os);
     m_pEventsTcpServer->SendToAllConnectedClients(os.str());
+}
+
+// Push the given event through Events TCP Server to a specific client
+void Host::SetMenuDisplay(bool menuDisplayOn)
+{
+    m_MenuDisplayOn = menuDisplayOn;
+}
+
+// Retrieve host data
+bool Host::GetHostUpdate(HostData& data)
+{
+    // Extract host IP
+    data.m_hostIP = m_hostInfo.GetIps().m_ip;
+
+    // Extract host_manager version
+    data.m_hostManagerVersion = m_hostInfo.GetVersion();
+
+    // Extract host Alias
+    data.m_hostAlias = m_hostInfo.GetAlias();
+
+    // Update devices status
+    if (!GetDeviceManager().GetDeviceStatus(data.m_devices))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+// Display host_manager_11ad menu
+void Host::DisplayMenu()
+{
+    // Clear the console screen
+#ifdef _WINDOWS
+    system("cls");
+#else
+    system("clear");
+#endif
+
+    int userInput;
+
+    string logCollectionAction = "Start";
+    if (GetDeviceManager().GetLogCollectionMode() == true)
+    {
+        logCollectionAction = "Stop";
+    }
+
+    // Display user menu options
+    cout << "Please enter select the number of the requested operation:" << endl;
+    cout << "    (1) " << logCollectionAction << " FW/uCode Log Collection" << endl;
+    cout << "    (2) " << " Exit" << endl;
+    cin >> userInput;
+
+    switch (userInput)
+    {
+    case 1:
+        // Toggle the log collection status
+        GetDeviceManager().SetLogCollectionMode(!GetDeviceManager().GetLogCollectionMode());
+        break;
+    case 2:
+        StopHost();
+        m_MenuDisplayOn = false;
+        break;
+    default:
+        break;
+    }
 }

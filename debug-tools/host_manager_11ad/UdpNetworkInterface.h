@@ -27,80 +27,31 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _SOCKET_H_
-#define _SOCKET_H_
+#ifndef _UDPNETWORKINTERFACE_H_
+#define _UDPNETWORKINTERFACE_H_
 
-#ifdef _WINDOWS
-#pragma comment(lib, "Ws2_32.lib")
-#endif
-
-#include <cstdlib>
-#include <cstdio>
-#include <cerrno>
-#include <cstring>
 #include <string>
 
-#ifdef _WINDOWS
-#include <winsock.h>
-#elif __linux
-#include <unistd.h>
-#include <netdb.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/wait.h>
-#else
-#include <sys/socket.h>
-#include <net/route.h>
-#include <net/if.h>
-#include <arpa/inet.h>
-#endif
-
-#ifdef _WINDOWS
-typedef int socklen_t;
-#endif
-
-
-namespace NetworkInterfaces
+class UdpNetworkInterface
 {
-    class NetworkInterface
-    {
-    private:
+public:
 
-        int m_fileDescriptor;
-        struct sockaddr_in m_localAddress;
-        char* m_buffer;
-        int m_bufferSize;
-        std::string m_peerName;
+    UdpNetworkInterface(std::string broadcastIp, int portIn, int portOut);
 
-    public:
+    ~UdpNetworkInterface() { Close(); }
 
-        NetworkInterface();
-        explicit NetworkInterface(int sockfd);
+    int Send(std::string message);
 
-        // Establish Connection
-        void Bind(int portNumber);
-        void Listen(int backlog = 5);
-        NetworkInterface Accept();
+    const char* Receive(int len);
 
-        // Send and Receive
-        bool SendString(const std::string& text);
-        bool SendString(const char* szText);
-        bool SendBuffer(const char* pBuf, size_t bufSize);
+    void Close();
 
-        const char* Receive(int size = 1024, int flags = 0);
-        const char* BinaryReceive(int size, int flags = 0);
+private:
 
-        // Terminate Connection
-        void Close();
-        void Shutdown(int type);
+    int m_portIn;
+    int m_portOut;
+    int m_socket;
+    std::string m_broadcastIp;
+};
 
-        // Addresses
-        const char* GetPeerName() const;
-        void UpdatePeerNameInternal();
-    };
-
-}
-
-#endif // !_NETWORK_INTERFACE_H_
+#endif

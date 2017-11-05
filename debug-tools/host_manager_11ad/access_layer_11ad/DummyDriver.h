@@ -60,10 +60,8 @@ public:
     virtual bool CreatePmcFile(unsigned refNumber, std::string& outMessage) { return false; };
     virtual bool FindPmcFile(unsigned refNumber, std::string& outMessage) { return false; };
 
-    virtual bool IsOpened(void) { return false; };
     virtual bool ReOpen() { return false; };
-    virtual bool DriverControl(uint32_t Id, const void *inBuf, uint32_t inBufSize, void *outBuf, uint32_t outBufSize) { return false; };
-    virtual DWORD DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DWORD DebugFSFlags) { return -1; };
+    virtual bool DriverControl(uint32_t Id, const void *inBuf, uint32_t inBufSize, void *outBuf, uint32_t outBufSize, DWORD* pLastError = nullptr) { return false; };
 
     virtual int GetDriverMode(int &currentState) { return 0; };
     virtual bool SetDriverMode(int newState, int &oldState) { return false; };

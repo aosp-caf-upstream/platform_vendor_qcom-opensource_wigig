@@ -35,8 +35,6 @@
 
 #include "DriverAPI.h"
 
-#define DEBUG_FS_MAX_PATH_LENGTH 1024
-
 using namespace std;
 
 class UnixPciDriver : public DriverAPI
@@ -52,15 +50,15 @@ class UnixPciDriver : public DriverAPI
         DWORD outBufSize;
     } IoctlHeader;
 
-    #define IOCTL_FLAG_SET 0x1
-    #define IOCTL_FLAG_GET 0x2
+#define IOCTL_FLAG_SET 0x1
+#define IOCTL_FLAG_GET 0x2
 
-    #define EP_OPERATION_READ 0
-    #define EP_OPERATION_WRITE 1
-    #define WIL_IOCTL_MEMIO (SIOCDEVPRIVATE + 2)
-    #define WIL_IOCTL_MEMIO_BLOCK (SIOCDEVPRIVATE + 3)
+#define EP_OPERATION_READ 0
+#define EP_OPERATION_WRITE 1
+#define WIL_IOCTL_MEMIO (SIOCDEVPRIVATE + 2)
+#define WIL_IOCTL_MEMIO_BLOCK (SIOCDEVPRIVATE + 3)
 
-    #define INVALID_FD -1
+#define INVALID_FD -1
 
     static __INLINE BYTE *
         IoctlDataIn(IoctlHeader *h)
@@ -88,27 +86,27 @@ class UnixPciDriver : public DriverAPI
     } IoctlIOBlock;
 
 public:
-    UnixPciDriver(string interfaceName) : DriverAPI(interfaceName)
+    explicit UnixPciDriver(string interfaceName) : DriverAPI(interfaceName)
     {
-        m_initialized = false;
     }
+
     ~UnixPciDriver();
 
     // Base access functions (to be implemented by specific device)
     bool Read(DWORD address, DWORD& value);
+    bool ReadBlock(DWORD address, DWORD blockSize, vector<DWORD>& values);
     bool ReadBlock(DWORD addr, DWORD blockSize, char *arrBlock); // blockSize is the size in bytes
     bool Write(DWORD address, DWORD value);
     bool WriteBlock(DWORD addr, vector<DWORD> values);
-
-    bool IsOpened(void);
+    bool WriteBlock(DWORD address, DWORD blockSize, const char *valuesToWrite);
 
     bool Open();
     bool ReOpen();
-    bool InternalOpen();
+
     bool DriverControl(uint32_t Id,
-        const void *inBuf, uint32_t inBufSize,
-        void *outBuf, uint32_t outBufSize);
-    DWORD DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DWORD DebugFSFlags);
+                       const void *inBuf, uint32_t inBufSize,
+                       void *outBuf, uint32_t outBufSize);
+//    DWORD DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DWORD DebugFSFlags);
 
     bool AllocPmc(unsigned descSize, unsigned descNum, std::string& outMessage);
     bool DeallocPmc(std::string& outMessage);
@@ -125,17 +123,18 @@ public:
     static set<string> Enumerate();
 
 private:
+
     bool InternalIoctl(void *dataBuf, DWORD dataBufLen, DWORD ioctlFlags);
     bool SendRWIoctl(IoctlIO & io, int fd, const char* interfaceName);
     bool SendRWBIoctl(IoctlIOBlock & io, int fd, const char* interfaceName);
     bool ValidateInterface();
+    bool IsValidInternal();
     bool SetDebugFsPath();
-    bool ReadBlock(DWORD address, DWORD blockSize, vector<DWORD>& values);
     static string NameDevice(string interfaceName);
 
-    bool m_initialized;
+    bool m_initialized = false;
 
-    int m_fileDescriptor;
+    int m_fileDescriptor = -1;
 
     string m_debugFsPath;
 };

@@ -50,7 +50,6 @@ void LogConfig::SetStatusBarPrinter(bool statusBarShow)
     std::cout << "m_ShowStatusBar is " << m_ShowStatusBar << std::endl;
 }
 
-
 void LogConfig::SetMaxSeverity(int traceLevel)
 {
     if (traceLevel > LOG_SEV_VERBOSE)

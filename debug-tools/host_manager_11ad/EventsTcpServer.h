@@ -30,7 +30,7 @@
 #ifndef _EVENTSTCPSERVER_H_
 #define _EVENTSTCPSERVER_H_
 
-#include "NetworkInterface.h"
+#include "TcpNetworkInterface.h"
 #include <memory>
 #include <mutex>
 #include "HostDefinitions.h"
@@ -66,7 +66,6 @@ public:
     * to renew the connection with this server).
     */
     bool SendToAllConnectedClients(const string& message);
-
     /*
     * Stop the events TCP server by doing some clean ups for the sockets.
     */
@@ -74,10 +73,12 @@ public:
 
 private:
     unsigned int m_port; //The port in which the events TCP server is working on
-    shared_ptr<NetworkInterfaces::NetworkInterface> m_pSocket;
+    shared_ptr<TcpNetworkInterfaces::NetworkInterface> m_pSocket;
     // clientsVector is a vector that keeps all the clients that are connected to the server and want to get events from the device or the host
-    vector<NetworkInterfaces::NetworkInterface> m_clientsVector;
+    vector<TcpNetworkInterfaces::NetworkInterface> m_clientsVector;
     mutex m_clientsVectorMutex; //Two different (or more) threads can access the clients vector - a mutex is needed
+
+    bool m_running;
 };
 
 

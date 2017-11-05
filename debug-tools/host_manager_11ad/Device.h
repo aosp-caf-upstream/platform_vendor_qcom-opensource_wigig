@@ -44,6 +44,8 @@
 #include "AccessLayerAPI.h"
 #include "EventsDefinitions.h"
 #include "HostDefinitions.h"
+#include "LogCollector.h"
+#include <thread>
 
 using namespace std;
 
@@ -55,6 +57,10 @@ public:
     virtual ~Device() {}
 
     // Functionality common to all devices
+
+    bool Init();
+
+    bool Fini();
 
     bool IsValid() const { return m_driver != nullptr; }
 
@@ -88,7 +94,7 @@ public:
 
     DriverAPI* GetDriver() const { return m_driver.get(); }
 
-    //TODO: make private after blocking simultanceous driver actions
+    //TODO: make private after blocking simultaneous driver actions
     mutable mutex m_mutex; // threads synchronization
 
     bool GetIsAlive(void) const { return m_isAlive; }
@@ -96,6 +102,25 @@ public:
     const FwVersion& GetFwVersion(void) const { return m_fwVersion; }
 
     const FwTimestamp& GetFwTimestamp(void) const { return m_fwTimestamp; }
+
+    DWORD GetCapabilities(void) const { return m_capabilitiesMask; }
+
+    // ************************ Log Collector *************************//
+    bool StartLogCollector(); // TODO - use GetLogCollector functions instead of this one and remove this function
+
+    bool StopLogCollector(); // TODO - use GetLogCollector functions instead of this one and remove this function
+
+    log_collector::LogCollector* GetLogCollector(CpuType type);
+
+    // *********************** [END] Log Collector *******************//
+
+    // ************************ Custom Regs *************************//
+    bool AddCustomRegister(const string& name, int address);
+
+    bool RemoveCustomRegister(const string& name);
+
+    std::map<string, int>& GetCustomRegisters();
+    // *********************** [END] Custom Regs *******************//
 
 private:
     BasebandType m_basebandType;
@@ -105,11 +130,20 @@ private:
     string m_deviceName;
     FwVersion m_fwVersion;
     FwTimestamp m_fwTimestamp;
+    map<CpuType,unique_ptr<log_collector::LogCollector>> m_logCollectors;
 
     BasebandType ReadBasebandType() const;
 
+    // Custom registers
+    std::map<std::string, int> m_customRegisters;
+
+    bool RegisterDriverControlEvents();
+
     // Internal service for fetching the FW version and compile time
     bool ReadDeviceFwInfoInternal(FwVersion& fwVersion, FwTimestamp& fwTimestamp) const;
+
+    void PollFwVersion(vector<unique_ptr<HostManagerEventBase>>& events);
+    void PollLogs(vector<unique_ptr<HostManagerEventBase>>& events);
 
     enum FwInfoRegisters : DWORD
     {
@@ -124,6 +158,18 @@ private:
         FW_TIMESTAMP_MONTH_REGISTER        = 0x880a24,
         FW_TIMESTAMP_YEAR_REGISTER        = 0x880a28
     };
+
+    // Capabilities region:
+    DWORD m_capabilitiesMask;
+
+    // each value in the enum represents a bit in the DWORD (the values would be 1,2,3,4...)
+    enum CAPABILITIES : DWORD
+    {
+        DRIVER_CONTROL_EVENTS // capability of the driver to send and receive driver control commands and events
+    };
+
+    void SetCapability(CAPABILITIES capability, bool isTrue);
+    bool IsCapabilitySet(CAPABILITIES capability) const;
 };
 
 #endif // !_11AD_DEVICE_H_

@@ -35,14 +35,16 @@
 #include <set>
 #include "Utils.h"
 #include "HostDefinitions.h"
+#include "HostManagerDefinitions.h"
+#include "LogCollectorDefinitions.h"
 #include "JsonSerializeHelper.h"
 
-// Base class for all events to be pushed to DMTools
+//=== Base class for all events to be pushed to DMTools
 class HostManagerEventBase
 {
 public:
-    HostManagerEventBase(const std::string& deviceName) :
-        m_timestampLocal(std::move(Utils::GetCurrentLocalTime())),
+    explicit HostManagerEventBase(const std::string& deviceName) :
+        m_timestampLocal(std::move(Utils::GetCurrentLocalTimeString())),
         m_deviceName(deviceName)
     {}
 
@@ -67,8 +69,8 @@ private:
     virtual void ToJsonInternal(JsonSerializeHelper& jsh) const = 0;
 };
 
-
-// === NewDeviceDiscoveredEvent:
+// =================================================================================== //
+// NewDeviceDiscoveredEvent
 
 // FW version struct with serialization support
 class SerializableFwVersion final : public FwVersion, public JsonSerializable
@@ -114,14 +116,14 @@ public:
         m_fwTimestamp(fwTimestamp)
     {}
 
+private:
+    SerializableFwVersion m_fwVersion;
+    SerializableFwTimestamp m_fwTimestamp;
+
     const char* GetTypeName() const override
     {
         return "NewDeviceDiscoveredEvent:#DmTools.Actors";
     }
-
-private:
-    SerializableFwVersion m_fwVersion;
-    SerializableFwTimestamp m_fwTimestamp;
 
     void ToJsonInternal(JsonSerializeHelper& jsh) const override
     {
@@ -130,32 +132,10 @@ private:
     }
 };
 
-//serialize the list of connected clients
-class SerializableConnectedUserList final : public JsonSerializable
-{
-public:
-    explicit SerializableConnectedUserList(const std::set<std::string> & newClientIPSet) : m_newClientIPSet(newClientIPSet)
-    {}
-private:
-    const std::set<std::string> & m_newClientIPSet;
-    void ToJson(ostream& os) const override
-    {
-        JsonSerializeHelper jsh(os);
-        int i = 0;
-        for (const std::string & client : m_newClientIPSet)
-        {
-            i++;
-            std::stringstream os;
-            os << "ConnectedClientIP" << i;
-            jsh.Serialize(os.str().c_str(), client);
-        }
+// =================================================================================== //
+// ClientConnectedEvent
 
-    }
-
-};
-
-
-class ClientConnectionEvent final : public HostManagerEventBase
+class ClientConnectedEvent final : public HostManagerEventBase
 {
 public:
     /*
@@ -163,40 +143,206 @@ public:
     newClient - the client that was connected or diconnected
     connected - true if newClient was connected and false if was disconnected
     */
-    ClientConnectionEvent(const std::set<std::string> & newClientIPSet, const std::string & newClient, bool connected) :
+    ClientConnectedEvent(const std::set<std::string> & newClientIPSet, const std::string & newClient) :
         HostManagerEventBase(""),
-        m_serializableNewClientIPSet(newClientIPSet),
-        m_newClient(newClient),
-        m_connected(connected)
+        m_ExistingClientIPSet(newClientIPSet),
+        m_newClient(newClient)
     {}
+
+private:
+    const std::set<std::string> m_ExistingClientIPSet;
+    const std::string m_newClient;
+    bool m_connected;
 
     const char* GetTypeName() const override
     {
-        return "ClientConnectionEvent:#DmTools.Actors";
+        return "ClientConnectedEvent:#DmTools.Actors";
     }
-
-private:
-    SerializableConnectedUserList m_serializableNewClientIPSet;
-    //const std::set<std::string> & m_newClientIPSet;
-    const std::string & m_newClient;
-    bool m_connected;
 
     void ToJsonInternal(JsonSerializeHelper& jsh) const override
     {
-        if (m_connected)
-        {
-            jsh.Serialize("NewConnectedUser", m_newClient);
-        }
-        else
-        {
-            jsh.Serialize("DisconnectedUser", m_newClient);
-        }
-
-        jsh.SerializeComposite("OtherConnectedUsers", m_serializableNewClientIPSet);
-
+        jsh.Serialize("NewConnectedUser", m_newClient);
+        jsh.SerializeStringArray("ExistingConnectedUsers", m_ExistingClientIPSet);
     }
-
 };
 
+class ClientDisconnectedEvent final : public HostManagerEventBase
+{
+public:
+    /*
+    newClientIPSet - a set of already connected users
+    newClient - the client that was diconnected
+    */
+    ClientDisconnectedEvent(const std::set<std::string> & newClientIPSet, const std::string & newClient) :
+        HostManagerEventBase(""),
+        m_ExistingClientIPSet(newClientIPSet),
+        m_newClient(newClient)
+    {}
+
+private:
+    const std::set<std::string> m_ExistingClientIPSet;
+    const std::string & m_newClient;
+    bool m_connected;
+
+    const char* GetTypeName() const override
+    {
+        return "ClientDisconnectedEvent:#DmTools.Actors";
+    }
+
+    void ToJsonInternal(JsonSerializeHelper& jsh) const override
+    {
+        jsh.Serialize("DisconnectedUser", m_newClient);
+        jsh.SerializeStringArray("ExistingConnectedUsers", m_ExistingClientIPSet);
+    }
+};
+
+//********************************** New Log Lines event **********************************************//
+class SerializableLogLineParams final : public JsonSerializable
+{
+public:
+    explicit SerializableLogLineParams(const std::vector<unsigned> & logLineParams) : m_logLineParams(logLineParams) {}
+
+private:
+    std::vector<unsigned> m_logLineParams;
+
+    void ToJson(ostream& os) const override
+    {
+        JsonSerializeHelper jsh(os);
+        int i = 0;
+        for (auto param : m_logLineParams)
+        {
+            i++;
+            std::stringstream os;
+            os << "Parameter" << i;
+            jsh.Serialize(os.str().c_str(), param);
+        }
+    }
+};
+
+class SerializableLogLine final : public log_collector::RawLogLine, public JsonSerializable
+{
+public:
+    explicit SerializableLogLine(RawLogLine logLine) : RawLogLine(logLine) {}
+
+private:
+
+    void ToJson(ostream& os) const override
+    {
+        JsonSerializeHelper jsh(os);
+        jsh.Serialize("Module", m_module);
+        jsh.Serialize("Level", m_level);
+        jsh.Serialize("StringOffset", m_strOffset);
+        jsh.Serialize("Signature", m_signature);
+        jsh.Serialize("IsString", m_isString);
+        jsh.Serialize("NumberOfParameters", m_params.size());
+        jsh.SerializeStringArray("Parameters", m_params);
+        jsh.Serialize("MLLR", m_missingLogsReason);
+        jsh.Serialize("NOMLLS", m_numOfMissingLogDwords);
+    }
+};
+
+class SerializableLogLinesList final : public JsonSerializable
+{
+public:
+    explicit SerializableLogLinesList(const std::vector<log_collector::RawLogLine> & logLines)
+    {
+        m_logLines.reserve(logLines.size());
+        for (const auto& logLine : logLines)
+        {
+            m_logLines.push_back(SerializableLogLine(logLine));
+        }
+    }
+
+private:
+    std::vector<SerializableLogLine> m_logLines;
+
+    void ToJson(ostream& os) const override
+    {
+        JsonSerializeHelper jsh(os);
+        int i = 0;
+        for (const SerializableLogLine & logLine : m_logLines)
+        {
+            i++;
+            std::stringstream os;
+            os << "LogLine" << i;
+            jsh.SerializeComposite(os.str().c_str(), logLine);
+        }
+    }
+};
+
+class NewLogsEvent final : public HostManagerEventBase
+{
+public:
+    NewLogsEvent(const std::string& deviceName, const CpuType& cpuType, const std::vector<log_collector::RawLogLine>& logLines) :
+        HostManagerEventBase(deviceName),
+        m_cpuType(cpuType)
+    {
+        m_logLines.reserve(logLines.size());
+        for (const auto& logLine : logLines)
+        {
+            m_logLines.emplace_back(new SerializableLogLine(logLine));
+        }
+    }
+
+private:
+    CpuType m_cpuType;
+    std::vector<std::unique_ptr<JsonSerializable>> m_logLines;
+
+    const char* GetTypeName() const override
+    {
+        return "NewLogsEvent:#DmTools.Actors";
+    }
+
+    void ToJsonInternal(JsonSerializeHelper& jsh) const override
+    {
+        jsh.Serialize("TracerType", CPU_TYPE_TO_STRING[m_cpuType]);
+        jsh.SerializeCompositeArray("LogLines", m_logLines);
+    }
+};
+//********************************** END - New Log Lines event **********************************************//
+
+// =================================================================================== //
+// DriverEvent
+
+// Event to be sent upon recieval of driver event
+class DriverEvent final : public HostManagerEventBase
+{
+public:
+    DriverEvent(const std::string& deviceName,
+        int driverEventType,
+        unsigned driverEventId,
+        unsigned listenId,
+        unsigned bufferLength,
+        const unsigned char* binaryData) :
+            HostManagerEventBase(deviceName),
+            m_driverEventType(driverEventType),
+            m_driverEventId(driverEventId),
+            m_listenId(listenId),
+            m_bufferLength(bufferLength),
+            m_binaryData(binaryData)
+    {}
+
+private:
+    const int m_driverEventType;
+    const unsigned m_driverEventId;
+    const unsigned m_listenId;
+    const unsigned m_bufferLength;
+    const unsigned char* m_binaryData;
+
+    const char* GetTypeName() const override
+    {
+        return "DriverEvent:#DmTools.Actors";
+    }
+
+    void ToJsonInternal(JsonSerializeHelper& jsh) const override
+    {
+        jsh.Serialize("DriverEventType", m_driverEventType);
+        jsh.Serialize("DriverEventId", m_driverEventId);
+        jsh.Serialize("ListenId", m_listenId);
+        jsh.Serialize("BinaryDataBase64", JsonSerializeHelper::Base64Encode(m_binaryData, m_bufferLength)); // bufferLength = 0 if buffer is empty
+    }
+};
+
+// =================================================================================== //
 
 #endif // _11AD_EVENTS_DEFINITIONS_H_

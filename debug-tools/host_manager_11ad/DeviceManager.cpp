@@ -28,7 +28,7 @@
  */
 
 #include <chrono>
-#include <thread>
+#include <sstream>
 
 #include "DeviceManager.h"
 #include "Utils.h"
@@ -36,14 +36,56 @@
 #include "DebugLogger.h"
 #include "Utils.h"
 #include "Host.h"
-#include <map>
-#include <sstream>
-#include <string>
-#include <exception>
+
+using namespace std;
+
+// Initialize translation maps for the front-end data
+const static std::string sc_noRfStr("NO_RF");
+const std::unordered_map<int, std::string> DeviceManager::m_rfTypeToString = { {0, sc_noRfStr }, {1, "MARLON"}, {2, "SPR-R"}, {3, "TLN-A1"}, { 4, "TLN-A2" } };
+
+const std::unordered_map<int, std::string> DeviceManager::m_basebandTypeToString =
+{
+    { 0, "UNKNOWN" }, { 1, "MAR-DB1" }, { 2, "MAR-DB2" },
+    { 3, "SPR-A0"  }, { 4, "SPR-A1"  }, { 5, "SPR-B0"  },
+    { 6, "SPR-C0"  }, { 7, "SPR-D0"  }, { 8, "TLN-M-A0"  },
+    { 9, "TLN-M-B0" }
+};
+
+const std::unordered_map<int, std::string> DeviceManager::m_boardfileTypeToString =
+{
+    { 0, "UNDEFINED" },
+    { 1, "generic_single_ant" },
+    { 2, "generic_SIP" },
+    { 3, "generic_reduced_size" },
+    { 4, "generic_patches_only" },
+    { 5, "generic_500mW" },
+    { 6, "generic_500mW_removed_RF" },
+    { 16, "ROGERS" },
+    { 32, "GENERIC_LTCC" },
+    { 48, "REGULATORY_LTCC" },
+    { 64, "FeiDao_6430u" },
+    { 80, "GENERIC_FALCON" },
+    { 112, "DELL_E7440_non-touch" },
+    { 113, "DELL_E7240_non" },
+    { 114, "DELL_E7440_touch" },
+    { 115, "DELL_E7240_touch" },
+    { 128, "Corse" },
+    { 144, "DELL_E5440" },
+    { 160, "MURATA_DELL_D5000" },
+    { 176, "DELL_XPS13" },
+    { 192, "TOSHIBA_Z10" },
+    { 208, "Semco_Sip" },
+    { 209, "Semco_Sip_rev1_3" },
+    { 224, "MTP-BStep" },
+    { 225, "MTP-CStep" },
+    { 240, "Liquid" },
+    { 257, "Murata SI" }
+};
 
 DeviceManager::DeviceManager(std::promise<void>& eventsTCPServerReadyPromise) :
     m_deviceManagerRestDurationMs(500),
-    m_terminate(false)
+    m_terminate(false),
+    m_collectLogs(false)
 {
     m_deviceManager = thread(&DeviceManager::PeriodicTasks, this, std::ref(eventsTCPServerReadyPromise));
 }
@@ -99,7 +141,22 @@ DeviceManagerOperationStatus DeviceManager::GetDevices(set<string>& devicesNames
     return dmosSuccess;
 }
 
-DeviceManagerOperationStatus DeviceManager::OpenInterface(string deviceName)
+std::shared_ptr<Device> DeviceManager::GetDeviceByName(const std::string& deviceName)
+{
+    m_connectedDevicesMutex.lock();
+    for (auto& device : m_devices)
+    {
+        if (deviceName == device.first)
+        {
+            m_connectedDevicesMutex.unlock();
+            return device.second;
+        }
+    }
+    m_connectedDevicesMutex.unlock();
+    return nullptr;
+}
+
+DeviceManagerOperationStatus DeviceManager::OpenInterface(const string& deviceName)
 {
     m_connectedDevicesMutex.lock();
     if (m_devices.count(deviceName) > 0)
@@ -111,7 +168,7 @@ DeviceManagerOperationStatus DeviceManager::OpenInterface(string deviceName)
     return dmosNoSuchConnectedDevice;
 }
 
-DeviceManagerOperationStatus DeviceManager::CloseInterface(string deviceName)
+DeviceManagerOperationStatus DeviceManager::CloseInterface(const string& deviceName)
 {
     m_connectedDevicesMutex.lock();
     if (m_devices.count(deviceName) > 0)
@@ -123,7 +180,7 @@ DeviceManagerOperationStatus DeviceManager::CloseInterface(string deviceName)
     return dmosNoSuchConnectedDevice;
 }
 
-DeviceManagerOperationStatus DeviceManager::Read(string deviceName, DWORD address, DWORD& value)
+DeviceManagerOperationStatus DeviceManager::Read(const string& deviceName, DWORD address, DWORD& value)
 {
     if (IsDeviceSilent(deviceName))
     {
@@ -162,7 +219,7 @@ DeviceManagerOperationStatus DeviceManager::Read(string deviceName, DWORD addres
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::Write(string deviceName, DWORD address, DWORD value)
+DeviceManagerOperationStatus DeviceManager::Write(const string& deviceName, DWORD address, DWORD value)
 {
     if (IsDeviceSilent(deviceName))
     {
@@ -199,7 +256,7 @@ DeviceManagerOperationStatus DeviceManager::Write(string deviceName, DWORD addre
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::ReadBlock(string deviceName, DWORD address, DWORD blockSize, vector<DWORD>& values)
+DeviceManagerOperationStatus DeviceManager::ReadBlock(const string& deviceName, DWORD address, DWORD blockSize, vector<DWORD>& values)
 {
     if (IsDeviceSilent(deviceName))
     {
@@ -238,7 +295,7 @@ DeviceManagerOperationStatus DeviceManager::ReadBlock(string deviceName, DWORD a
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::WriteBlock(string deviceName, DWORD address, const vector<DWORD>& values)
+DeviceManagerOperationStatus DeviceManager::WriteBlock(const string& deviceName, DWORD address, const vector<DWORD>& values)
 {
     if (IsDeviceSilent(deviceName))
     {
@@ -275,7 +332,7 @@ DeviceManagerOperationStatus DeviceManager::WriteBlock(string deviceName, DWORD 
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::InterfaceReset(string deviceName)
+DeviceManagerOperationStatus DeviceManager::InterfaceReset(const string& deviceName)
 {
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -295,7 +352,7 @@ DeviceManagerOperationStatus DeviceManager::InterfaceReset(string deviceName)
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::SwReset(string deviceName)
+DeviceManagerOperationStatus DeviceManager::SwReset(const string& deviceName)
 {
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -322,7 +379,7 @@ DeviceManagerOperationStatus DeviceManager::SwReset(string deviceName)
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::SetDriverMode(string deviceName, int newMode, int& oldMode)
+DeviceManagerOperationStatus DeviceManager::SetDriverMode(const string& deviceName, int newMode, int& oldMode)
 {
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -349,7 +406,7 @@ DeviceManagerOperationStatus DeviceManager::SetDriverMode(string deviceName, int
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::DriverControl(string deviceName, uint32_t Id, const void *inBuf, uint32_t inBufSize, void *outBuf, uint32_t outBufSize)
+DeviceManagerOperationStatus DeviceManager::DriverControl(const string& deviceName, uint32_t Id, const void *inBuf, uint32_t inBufSize, void *outBuf, uint32_t outBufSize)
 {
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -376,7 +433,7 @@ DeviceManagerOperationStatus DeviceManager::DriverControl(string deviceName, uin
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::AllocPmc(string deviceName, unsigned descSize, unsigned descNum, string& errorMsg)
+DeviceManagerOperationStatus DeviceManager::AllocPmc(const string& deviceName, unsigned descSize, unsigned descNum, string& errorMsg)
 {
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -407,7 +464,7 @@ DeviceManagerOperationStatus DeviceManager::AllocPmc(string deviceName, unsigned
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::DeallocPmc(string deviceName, std::string& outMessage)
+DeviceManagerOperationStatus DeviceManager::DeallocPmc(const string& deviceName, std::string& outMessage)
 {
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -436,7 +493,7 @@ DeviceManagerOperationStatus DeviceManager::DeallocPmc(string deviceName, std::s
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::CreatePmcFile(string deviceName, unsigned refNumber, std::string& outMessage)
+DeviceManagerOperationStatus DeviceManager::CreatePmcFile(const string& deviceName, unsigned refNumber, std::string& outMessage)
 {
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -463,7 +520,7 @@ DeviceManagerOperationStatus DeviceManager::CreatePmcFile(string deviceName, uns
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::FindPmcFile(string deviceName, unsigned refNumber, std::string& outMessage)
+DeviceManagerOperationStatus DeviceManager::FindPmcFile(const string& deviceName, unsigned refNumber, std::string& outMessage)
 {
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -490,7 +547,7 @@ DeviceManagerOperationStatus DeviceManager::FindPmcFile(string deviceName, unsig
     }
 }
 
-DeviceManagerOperationStatus DeviceManager::SendWmi(string deviceName, DWORD command, const vector<DWORD>& payload)
+DeviceManagerOperationStatus DeviceManager::SendWmi(const string& deviceName, DWORD command, const vector<DWORD>& payload)
 {
     if (IsDeviceSilent(deviceName))
     {
@@ -522,10 +579,11 @@ DeviceManagerOperationStatus DeviceManager::SendWmi(string deviceName, DWORD com
     }
 }
 
-void DeviceManager::CreateDevice(string deviceName)
+void DeviceManager::CreateDevice(const string& deviceName)
 {
     m_connectedDevicesMutex.lock();
     shared_ptr<Device> device(new Device(deviceName));
+    device->Init();
     m_devices.insert(make_pair(deviceName, device));
     m_connectedDevicesMutex.unlock();
 
@@ -543,11 +601,12 @@ void DeviceManager::CreateDevice(string deviceName)
     }
 }
 
-void DeviceManager::DeleteDevice(string deviceName)
+void DeviceManager::DeleteDevice(const string& deviceName)
 {
     m_connectedDevicesMutex.lock();
     // make sure that no client is using this object
     m_devices[deviceName]->m_mutex.lock();
+    m_devices[deviceName]->Fini();
     // no need that the mutex will be still locked since new clients have to get m_connectedDevicesMutex before they try to get m_mutex
     m_devices[deviceName]->m_mutex.unlock();
     m_devices.erase(deviceName);
@@ -565,9 +624,9 @@ void DeviceManager::UpdateConnectedDevices()
         {
             continue;
         }
-        DWORD value = Utils::REGISTER_DEFAULT_VALUE;
+
         connectedDevice.second->m_mutex.lock();
-        if (!connectedDevice.second->GetDriver()->Read(BAUD_RATE_REGISTER, value))
+        if (!connectedDevice.second->GetDriver()->IsValid())
         {
             devicesForRemove.push_back(connectedDevice.first);
         }
@@ -650,27 +709,12 @@ void DeviceManager::PeriodicTasks(std::promise<void>& eventsTCPServerReadyPromis
             {
                 Host::GetHost().PushEvent(*event.get());
             }
-
-            try
-            {
-                if (LOG_STATUS)
-                {
-                    string statusString = GetStatusBarString(device.second);
-                    system("clear");
-                    cout << "\033[2J\033[1;1H";
-                    cout << "\r" << statusString << flush;
-                }
-            }
-            catch (exception e)
-            {
-                cout << e.what() << endl;
-            }
         }
         this_thread::sleep_for(std::chrono::milliseconds(m_deviceManagerRestDurationMs));
     }
 }
 
-bool DeviceManager::IsDeviceSilent(string deviceName)
+bool DeviceManager::IsDeviceSilent(const string& deviceName)
 {
     bool isSilent = false;
     m_connectedDevicesMutex.lock();
@@ -697,74 +741,122 @@ bool DeviceManager::IsDeviceSilent(string deviceName)
     return isSilent;
 }
 
-
-string DeviceManager::GetStatusBarString(shared_ptr<Device> device)
+bool DeviceManager::GetDeviceStatus(vector<DeviceData>& devicesData)
 {
-    return "Not Supported";
-    /*try
+    // Lock the devices
+    lock_guard<mutex> lock(m_connectedDevicesMutex);
+
+    auto devices = m_devices;
+
+    for (auto& device : devices)
     {
-        lock_guard<mutex> lock(device->m_mutex);
+        // Lock the specific device
+        lock_guard<mutex> lock(device.second->m_mutex);
 
-        DWORD FwMajhexVal;
-        device->GetDriver()->Read(0x880a2c, FwMajhexVal);
-        string FwMaj = to_string(FwMajhexVal);
+        // Create device data
+        DeviceData deviceData;
 
-        DWORD FwMinhexVal;
-        device->GetDriver()->Read( 0x880a30, FwMinhexVal);
-        string FwMin = to_string(FwMinhexVal);
+        // Extract FW version
+        deviceData.m_fwVersion = device.second->GetFwVersion();
 
-        DWORD FwBuildhexVal;
-        device->GetDriver()->Read( 0x880a38, FwBuildhexVal);
-        string FwBuild = to_string(FwBuildhexVal);
+        DWORD value = Utils::REGISTER_DEFAULT_VALUE;
 
-        DWORD RfStathexVal;
-        device->GetDriver()->Read( 0x880A68, RfStathexVal);
-        string RfStat = (RfStathexVal == 0) ? "RF_OK" : "RF_NO_COMM";
+        // Read FW assert code
+        device.second->GetDriver()->Read(FW_ASSERT_REG, value);
+        deviceData.m_fwAssert = value;
 
-        DWORD FwErrorhexVal;
-        device->GetDriver()->Read( 0x91F020, FwErrorhexVal);
-        string FwError = (FwErrorhexVal == 0) ? "OK" : to_string(FwErrorhexVal);
+        // Read uCode assert code
+        device.second->GetDriver()->Read(UCODE_ASSERT_REG, value);
+        deviceData.m_uCodeAssert = value;
 
-        DWORD UcErrorhexVal;
-        device->GetDriver()->Read( 0x91F028, UcErrorhexVal);
-        string UcError = (UcErrorhexVal == 0) ? "OK" : to_string(UcErrorhexVal);
+        // Read FW association state
+        device.second->GetDriver()->Read(FW_ASSOCIATION_REG, value);
+        deviceData.m_associated = (value == FW_ASSOCIATED_VALUE);
 
-        DWORD FwStatehexVal;
-        device->GetDriver()->Read( 0x880A44, FwStatehexVal);
-        string FwState;
-        switch (FwStatehexVal)
+        // Read MCS value
+        device.second->GetDriver()->Read(MCS_REG, value);
+        deviceData.m_mcs = value;
+
+        // Get FW compilation timestamp
+        deviceData.m_compilationTime = device.second->GetFwTimestamp();
+
+        // Get Device name
+        deviceData.m_deviceName = device.second->GetDeviceName();
+
+        // Get baseband name & RF type
+        // BB type is stored in 2 lower bytes of device type register
+        // RF type is stored in 2 upper bytes of device type register
+        device.second->GetDriver()->Read(DEVICE_TYPE_REG, value);
+        const auto basebandTypeIter = m_basebandTypeToString.find(value & 0xFFFF);
+        deviceData.m_hwType = basebandTypeIter != m_basebandTypeToString.cend() ? basebandTypeIter->second : std::string("UNKNOWN");
+        const auto rfTypeIter = m_rfTypeToString.find((value & 0xFFFF0000) >> 16);
+        deviceData.m_rfType = rfTypeIter != m_rfTypeToString.cend() ? rfTypeIter->second : sc_noRfStr;
+
+        // Get FW mode
+        device.second->GetDriver()->Read(FW_MODE_REG, value);
+        deviceData.m_mode = (value == 0) ? "Operational" : "WMI Only";
+
+        // Get boot loader version
+        device.second->GetDriver()->Read(BOOT_LOADER_VERSION_REG, value);
+        std::ostringstream oss;
+        oss << value;
+        deviceData.m_bootloaderVersion = oss.str();
+
+        // Get channel number
+        device.second->GetDriver()->Read(CHANNEL_REG, value);
+        int Channel = 0;
+        switch (value)
         {
-        case 1:
-            FwState = "FW_LOADED";
+        case 0x64FCACE:
+            Channel = 1;
             break;
-        case 2:
-            FwState = "FLASH_INIT";
+        case 0x68BA2E9:
+            Channel = 2;
             break;
-        case 3:
-            FwState = "CALIB";
-            break;
-        case 4:
-            FwState = "IDLE";
-            break;
-        case 5:
-            FwState = "CONNECTING...";
-            break;
-        case 6:
-            FwState = "ASSOCIATED";
-            break;
-        case 7:
-            FwState = "DISCONNECTING...";
+        case 0x6C77B03:
+            Channel = 3;
             break;
         default:
-            FwState = to_string(FwStatehexVal);
+            Channel = 0;
         }
-        DWORD BF_MCShexVal;
-        device->GetDriver()->Read( 0x880A60, BF_MCShexVal);
-        string BF_MCS = to_string(BF_MCShexVal);
+        deviceData.m_channel = Channel;
 
-        DWORD UcRxonhexVal;
-        device->GetDriver()->Read(0x9405BE, UcRxonhexVal);
-        DWORD UcRxonhexVal16 = UcRxonhexVal << 16;
+        // Get board file version
+        device.second->GetDriver()->Read(BOARDFILE_REG, value);
+        const auto boardfileTypeIter = m_boardfileTypeToString.find((value & 0xFFF000) >> 12);
+        deviceData.m_boardFile = boardfileTypeIter != m_boardfileTypeToString.cend() ? boardfileTypeIter->second : std::string("UNDEFINED");
+
+        DWORD rfConnected;
+        DWORD rfEnabled;
+        device.second->GetDriver()->Read(RF_CONNECTED_REG, rfConnected);
+        device.second->GetDriver()->Read(RF_ENABLED_REG, rfEnabled);
+        rfEnabled = rfEnabled >> 8;
+
+        // Get RF state of each RF
+        for (int rfIndex = 0; rfIndex < MAX_RF_NUMBER; rfIndex++)
+        {
+            int rfState = 0;
+
+            if (rfConnected & (1 << rfIndex))
+            {
+                rfState = 1;
+            }
+
+            if (rfEnabled & (1 << rfIndex))
+            {
+                rfState = 2;
+            }
+
+            // TODO extract RF state for each RF
+            deviceData.m_rf.insert(deviceData.m_rf.end(), rfState);
+        }
+
+        ////////// Get fixed registers values //////////////////////////
+        RegisterData registerData;
+
+        // uCode Rx on fixed reg
+        device.second->GetDriver()->Read(UCODE_RX_ON_REG, value);
+        DWORD UcRxonhexVal16 = value && 0xFFFF;
         string UcRxon;
         switch (UcRxonhexVal16)
         {
@@ -778,25 +870,24 @@ string DeviceManager::GetStatusBarString(shared_ptr<Device> device)
             UcRxon = "RX_ON";
             break;
         default:
-            UcRxon = to_string(UcRxonhexVal16);
+            UcRxon = "Unrecognized";
         }
+        registerData.m_name = "uCodeRxOn";
+        registerData.m_value = UcRxon;
+        deviceData.m_fixedRegisters.insert(deviceData.m_fixedRegisters.end(), registerData);
 
-        DWORD TX_GPhexVal;
-        device->GetDriver()->Read( 0x880A58, TX_GPhexVal);
-        string TX_GP = (TX_GPhexVal == 0) ? "NO_LINK" : to_string(TX_GPhexVal);
+        // BF Sequence fixed reg
+        device.second->GetDriver()->Read(BF_SEQ_REG, value);
+        oss.str("");
+        oss << value;
+        registerData.m_name = "BF_Seq";
+        registerData.m_value = oss.str();
+        deviceData.m_fixedRegisters.insert(deviceData.m_fixedRegisters.end(), registerData);
 
-        DWORD RX_GPhexVal;
-        device->GetDriver()->Read( 0x880A5C, RX_GPhexVal);
-        string RX_GP = (RX_GPhexVal == 0) ? "NO_LINK" : to_string(RX_GPhexVal);
-
-        DWORD BD_SEQhexVal;
-        device->GetDriver()->Read(0x941374, BD_SEQhexVal);
-        string BD_SEQ = to_string(BD_SEQhexVal);
-
-        DWORD BF_TRIGhexVal;
-        device->GetDriver()->Read(0x941380, BF_TRIGhexVal);
+        // BF Trigger fixed reg
+        device.second->GetDriver()->Read(BF_TRIG_REG, value);
         string BF_TRIG = "";
-        switch (BF_TRIGhexVal)
+        switch (value)
         {
         case 1:
             BF_TRIG = "MCS1_TH_FAILURE";
@@ -817,79 +908,130 @@ string DeviceManager::GetStatusBarString(shared_ptr<Device> device)
             BF_TRIG = "MAX_BCK_FAIL_ION_KEEP_ALIVE";
             break;
         default:
-            BF_TRIG = to_string(BF_TRIGhexVal);
+            BF_TRIG = "UNDEFINED";
         }
+        registerData.m_name = "BF_Trig";
+        registerData.m_value = BF_TRIG;
+        deviceData.m_fixedRegisters.insert(deviceData.m_fixedRegisters.end(), registerData);
 
-        DWORD CHANNELhexVal;
-        device->GetDriver()->Read(0x883020, CHANNELhexVal);
-        string CHANNEL = "CHANNEL";
-        switch (CHANNELhexVal)
+        // Get NAV fixed reg
+        device.second->GetDriver()->Read(NAV_REG, value);
+        registerData.m_name = "NAV";
+        oss.str("");
+        oss << value;
+        registerData.m_value = oss.str();
+        deviceData.m_fixedRegisters.insert(deviceData.m_fixedRegisters.end(), registerData);
+
+        // Get TX Goodput fixed reg
+        device.second->GetDriver()->Read(TX_GP_REG, value);
+        string TX_GP = "NO_LINK";
+        if (value != 0)
         {
-        case 0x64FCACE:
-            CHANNEL = "CHANNEL_1";
-            break;
-        case 0x68BA2E9:
-            CHANNEL = "CHANNEL_2";
-            break;
-        case 0x6C77B03:
-            CHANNEL = "CHANNEL_3";
-            break;
-        default:
-            CHANNEL = to_string(CHANNELhexVal);
+            oss.str("");
+            oss << value;
+            TX_GP = oss.str();
+        }
+        registerData.m_name = "TX_GP";
+        registerData.m_value = TX_GP;
+        deviceData.m_fixedRegisters.insert(deviceData.m_fixedRegisters.end(), registerData);
+
+        // Get RX Goodput fixed reg
+        device.second->GetDriver()->Read(RX_GP_REG, value);
+        string RX_GP = "NO_LINK";
+        if (value != 0)
+        {
+            oss.str("");
+            oss << value;
+            TX_GP = oss.str();
+        }
+        registerData.m_name = "RX_GP";
+        registerData.m_value = RX_GP;
+        deviceData.m_fixedRegisters.insert(deviceData.m_fixedRegisters.end(), registerData);
+
+        ////////////// Fixed registers end /////////////////////////
+
+        ////////////// Custom registers ////////////////////////////
+        for (auto& reg : device.second->GetCustomRegisters())
+        {
+            registerData.m_name = reg.first;
+            device.second->GetDriver()->Read(reg.second, value);
+            oss.str("");
+            oss << value;
+            registerData.m_value = oss.str();
+            deviceData.m_customRegisters.insert(deviceData.m_customRegisters.end(), registerData);
         }
 
-        DWORD NAVhexVal;
-        device->GetDriver()->Read( 0x940490, NAVhexVal);
-        string NAV = to_string(NAVhexVal);
+        ////////////// Custom registers end ////////////////////////
 
-        stringstream s;
+        ////////////// Temperatures ////////////////////////////////
+        // Baseband
+        device.second->GetDriver()->Read(BASEBAND_TEMPERATURE_REG, value);
+        float temperature = (float)value / 1000;
+        oss.str("");
+        oss.precision(2);
+        oss << fixed << temperature;
+        deviceData.m_hwTemp = oss.str();
 
-        s << "status bar is:" \
-            << " || Fw_Version:" << FwMaj << "." << FwMin << "." << FwBuild \
-            << " || RfStat:" << RfStat \
-            << " || FwError:" << FwError \
-            << " || UcError:" << UcError \
-            << " || FwState:" << FwState \
-            << " || BF_MCS:" << BF_MCS \
-            << " || UC_RXON:" << UcRxon \
-            << " || TX_GP:" << TX_GP \
-            << " || RX_GP:" << RX_GP \
-            << " || BD_SEQ:" << BD_SEQ \
-            << " || BF_TRIG:" << BF_TRIG \
-            << " || CHANNEL:" << CHANNEL \
-            << " || NAV:" << NAV << flush;
+        // RF
+        if (deviceData.m_rfType != sc_noRfStr)
+        {
+            device.second->GetDriver()->Read(RF_TEMPERATURE_REG, value);
+            temperature = (float)value / 1000;
+            oss.str("");
+            oss.precision(2);
+            oss << fixed << temperature;
+            deviceData.m_rfTemp = oss.str();
+        }
+        else // no RF, temperature value is not relevant
+        {
+            deviceData.m_rfTemp = "";
+        }
+        ////////////// Temperatures end ///////////////////////////
 
-        std::string formatedStatusBar = s.str();
-        return formatedStatusBar;
+        // Add the device to the devices list
+        devicesData.insert(devicesData.end(), deviceData);
     }
-    catch (exception e) {
-        cout << e.what() << endl;
-        return "";
-    }*/
+
+    return true;
 }
 
+bool DeviceManager::AddRegister(const string& deviceName, const string& registerName, int address)
+{
+    lock_guard<mutex> lock(m_connectedDevicesMutex);
 
-/*
+    if (m_devices.count(deviceName) <= 0)
+    {
+        return false;
+    }
 
-FwMaj =
-FwMin =
-FwBuild
-RfStat =
-FwError
-UcError
-FwState;
-BF_MCS =
-UcRxon;
-TX_GP =
-RX_GP =
-BD_SEQ =
-BF_TRIG
-CHANNEL
-NAV = to
+    if ((NULL == m_devices[deviceName].get()) || (!m_devices[deviceName]->AddCustomRegister(registerName, address)))
+    {
+        LOG_ERROR << "Trying to add an already existing custom register name" << endl;
+        return false;
+    }
 
-*/
+    return true;
+}
 
-DeviceManagerOperationStatus DeviceManager::SetDeviceSilentMode(string deviceName, bool silentMode)
+bool DeviceManager::RemoveRegister(const string& deviceName, const string& registerName)
+{
+    lock_guard<mutex> lock(m_connectedDevicesMutex);
+
+    if (m_devices.count(deviceName) <= 0)
+    {
+        return false;
+    }
+
+    if ((NULL == m_devices[deviceName].get()) || (!m_devices[deviceName]->RemoveCustomRegister(registerName)))
+    {
+        LOG_ERROR << "Trying to remove a non-existing custom register name" << endl;
+        return false;
+    }
+
+    return true;
+}
+
+DeviceManagerOperationStatus DeviceManager::SetDeviceSilentMode(const string& deviceName, bool silentMode)
 {
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -910,7 +1052,7 @@ DeviceManagerOperationStatus DeviceManager::SetDeviceSilentMode(string deviceNam
 }
 
 
-DeviceManagerOperationStatus DeviceManager::GetDeviceSilentMode(string deviceName, bool& silentMode)
+DeviceManagerOperationStatus DeviceManager::GetDeviceSilentMode(const string& deviceName, bool& silentMode)
 {
     DeviceManagerOperationStatus status;
     m_connectedDevicesMutex.lock();
@@ -919,6 +1061,165 @@ DeviceManagerOperationStatus DeviceManager::GetDeviceSilentMode(string deviceNam
         lock_guard<mutex> lock(m_devices[deviceName]->m_mutex);
         m_connectedDevicesMutex.unlock();
         silentMode = m_devices[deviceName]->GetSilenceMode();
+        status = dmosSuccess;
+    }
+    else
+    {
+        m_connectedDevicesMutex.unlock();
+        status = dmosNoSuchConnectedDevice;
+    }
+
+    return status;
+}
+
+
+// Log functions
+bool DeviceManager::GetLogCollectionMode() const
+{
+    return m_collectLogs;
+}
+
+void DeviceManager::SetLogCollectionMode(bool collectLogs)
+{
+    m_collectLogs = collectLogs;
+
+    // Start/Stop log collector for all devices
+    m_connectedDevicesMutex.lock();
+    for (auto& connectedDevice : m_devices)
+    {
+        connectedDevice.second->m_mutex.lock();
+
+        if (collectLogs == false)
+        {
+            connectedDevice.second->StopLogCollector();
+        }
+        else
+        {
+            connectedDevice.second->StartLogCollector();
+        }
+
+        connectedDevice.second->m_mutex.unlock();
+    }
+    m_connectedDevicesMutex.unlock();
+}
+
+bool DeviceManager::SetLogCollectionConfiguration(const vector<string>& deviceNames, const vector<string>& cpuTypeNames, const string& parameter, const string& value, string& errorMessage)
+{
+    bool success;
+    errorMessage = "";
+    stringstream errorMessageSs;
+    for (auto& deviceName : deviceNames)
+    {
+        shared_ptr<Device> d = GetDeviceByName(deviceName);
+        if (nullptr == d)
+        {
+            success = false;
+            errorMessageSs << "device name " << deviceName << " doesn't exist; ";
+            continue;
+        }
+
+        for (auto& cpuTypeName : cpuTypeNames)
+        {
+            auto found = STRING_TO_CPU_TYPE.find(cpuTypeName);
+            if (STRING_TO_CPU_TYPE.end() == found)
+            {
+                success = false;
+                errorMessageSs << "no such cpu named " << cpuTypeName << ". Can be only FW/UCODE; ";
+                continue;
+            }
+            log_collector::LogCollector* pLogCollector = d->GetLogCollector(found->second);
+            if (nullptr == pLogCollector)
+            {
+                success = false;
+                errorMessageSs << "device " << deviceName << " has no active tracer for " << cpuTypeName << "; ";
+                continue;
+            }
+            pLogCollector->SetConfigurationParamerter(parameter, value);
+        }
+    }
+    errorMessageSs << endl;
+    errorMessage = errorMessageSs.str();
+    return success;
+}
+
+string DeviceManager::GetLogCollectionConfiguration(const vector<string>& deviceNames, const vector<string>& cpuTypeNames, string parameter)
+{
+    stringstream res;
+    bool success;
+    for (auto& deviceName : deviceNames)
+    {
+        shared_ptr<Device> d = GetDeviceByName(deviceName);
+        if (nullptr == d)
+        {
+            res << "device name " << deviceName << " doesn't exist; ";
+            continue;
+        }
+
+        for (auto& cpuTypeName : cpuTypeNames)
+        {
+            auto found = STRING_TO_CPU_TYPE.find(cpuTypeName);
+            if (STRING_TO_CPU_TYPE.end() == found)
+            {
+                res << "no such cpu named " << cpuTypeName << ". Can be only FW/UCODE; ";
+                continue;
+            }
+            log_collector::LogCollector* pLogCollector = d->GetLogCollector(found->second);
+            if (nullptr == pLogCollector)
+            {
+                res << "device " << deviceName << " has no active tracer for " << cpuTypeName << "; ";
+                continue;
+            }
+
+            res << "device-" << deviceName << "-cpu-" << cpuTypeName << "-parameter-" << parameter << "=" << pLogCollector->GetConfigurationParameterValue(parameter, success) << ";"; // TODO - create constants for "=" and ";"
+        }
+    }
+    res << endl;
+    return res.str();
+}
+
+string DeviceManager::DumpLogCollectionConfiguration(const vector<string>& deviceNames, const vector<string>& cpuTypeNames)
+{
+    stringstream res;
+    for (auto& deviceName : deviceNames)
+    {
+        shared_ptr<Device> d = GetDeviceByName(deviceName);
+        if (nullptr == d)
+        {
+            res << "device name " << deviceName << " doesn't exist; ";
+            continue;
+        }
+
+        for (auto& cpuTypeName : cpuTypeNames)
+        {
+            auto found = STRING_TO_CPU_TYPE.find(cpuTypeName);
+            if (STRING_TO_CPU_TYPE.end() == found)
+            {
+                res << "no such cpu named " << cpuTypeName << ". Can be only FW/UCODE; ";
+                continue;
+            }
+            log_collector::LogCollector* pLogCollector = d->GetLogCollector(found->second);
+            if (nullptr == pLogCollector)
+            {
+                res << "device " << deviceName << " has no active tracer for " << cpuTypeName << "; ";
+                continue;
+            }
+
+            res << "device-" << deviceName << "-cpu-" << cpuTypeName << ":" << pLogCollector->GetConfigurationDump() << ";";  // TODO - create constants for "=" and ";"
+        }
+    }
+    res << endl;
+    return res.str();
+}
+
+DeviceManagerOperationStatus DeviceManager::GetDeviceCapabilities(const string& deviceName, DWORD& capabilities)
+{
+    DeviceManagerOperationStatus status;
+    m_connectedDevicesMutex.lock();
+    if (m_devices.count(deviceName) > 0)
+    {
+        lock_guard<mutex> lock(m_devices[deviceName]->m_mutex);
+        m_connectedDevicesMutex.unlock();
+        capabilities = m_devices[deviceName]->GetCapabilities();
         status = dmosSuccess;
     }
     else

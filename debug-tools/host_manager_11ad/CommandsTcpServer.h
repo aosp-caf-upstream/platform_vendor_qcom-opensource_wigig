@@ -30,7 +30,7 @@
 #ifndef _COMMANDSTCPSERVER_H_
 #define _COMMANDSTCPSERVER_H_
 
-#include "NetworkInterface.h"
+#include "TcpNetworkInterface.h"
 #include <memory>
 #include "HostDefinitions.h"
 #include "CommandsHandler.h"
@@ -67,14 +67,16 @@ public:
 private:
 
     unsigned int m_port; //The port in which the commands TCP server is working on
-    shared_ptr<NetworkInterfaces::NetworkInterface> m_pSocket; //an object that holds the connection with each client
+    shared_ptr<TcpNetworkInterfaces::NetworkInterface> m_pSocket; //an object that holds the connection with each client
     Host& m_host; // refernce to the host object (that is passed to commandsHandler each time a new TCP connection is created)
 
-    void ServerThread(NetworkInterfaces::NetworkInterface client);
-    ConnectionStatus Reply(NetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage);
-    ConnectionStatus ReplyBuffer(NetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage);
-    ConnectionStatus ReplyFile(NetworkInterfaces::NetworkInterface &client, ResponseMessage &fileName);
-    ConnectionStatus ReplyBinary(NetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage);
+    void ServerThread(TcpNetworkInterfaces::NetworkInterface client);
+    ConnectionStatus Reply(TcpNetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage);
+    ConnectionStatus ReplyBuffer(TcpNetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage);
+    ConnectionStatus ReplyFile(TcpNetworkInterfaces::NetworkInterface &client, ResponseMessage &fileName);
+    ConnectionStatus ReplyBinary(TcpNetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage);
+
+    bool m_running;
 };
 
 

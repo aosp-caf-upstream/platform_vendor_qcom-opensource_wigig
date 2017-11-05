@@ -28,9 +28,10 @@
  */
 
 #include "EventsTcpServer.h"
+#include "Host.h"
 
 EventsTcpServer::EventsTcpServer(unsigned int eventsTcpPort)
-    :m_port(eventsTcpPort), m_pSocket(new NetworkInterfaces::NetworkInterface())
+    :m_port(eventsTcpPort), m_pSocket(new TcpNetworkInterfaces::NetworkInterface()), m_running(true)
 {
 }
 
@@ -42,11 +43,11 @@ void EventsTcpServer::Start()
 
     //Infinite loop because it has to wait for clients to connect to it forever, there's no reason to stop it
     //unless there is a problem.
-    while (true)
+    while (m_running)
     {
         try
         {
-            NetworkInterfaces::NetworkInterface newClient = m_pSocket->Accept();
+            TcpNetworkInterfaces::NetworkInterface newClient = m_pSocket->Accept();
             //LOG_INFO << "Adding a new client to the Events TCP Server: " << newClient.getPeerName() << endl;
             //using unique_lock promises that in case of exception the mutex is unlocked:
             lock_guard<mutex> clientsVectorLock(m_clientsVectorMutex);
@@ -104,6 +105,8 @@ bool EventsTcpServer::SendToAllConnectedClients(const string& message)
 void EventsTcpServer::Stop()
 {
     LOG_INFO << "Stopping the events TCP server" << endl;
-    m_pSocket->Shutdown(2); //type 2 -> Acts like the close(), shutting down both input and output
+    m_pSocket->Close(); //type 2 -> Acts like the close(), shutting down both input and output
     m_pSocket.reset();
+
+    m_running = false;
 }

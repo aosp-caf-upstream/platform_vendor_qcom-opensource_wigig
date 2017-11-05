@@ -29,7 +29,7 @@
 
 #include <sstream>
 #include "DummyDriver.h"
-#include "../Utils.h"
+#include "Utils.h"
 
 //////////////////////////////////////////////////////////////////////////
 // Test Device interface

@@ -34,7 +34,7 @@
 #include <thread>
 #include "HostDefinitions.h"
 #include "CommandsHandler.h"
-#include "UdpTempOsAbstruction.h"
+#include "UdpNetworkInterface.h"
 
 class Host;
 
@@ -85,9 +85,10 @@ private:
     unsigned int m_udpPortIn; // the local host port
     unsigned int m_udpPortOut; // the remote host port
     string m_broadcastIp;
-    unique_ptr<UdpSocket> m_pSocket;
+    unique_ptr<UdpNetworkInterface> m_pSocket;
     CommandsHandler m_CommandHandler;
     static const int m_maxMessageLength;
+    bool m_running;
 };
 
 

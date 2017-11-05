@@ -27,14 +27,18 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "NetworkInterface.h"
+#include "TcpNetworkInterface.h"
 #include "DebugLogger.h"
 
 #include <cerrno>
 #include <string.h>
 #include <stdlib.h>
 
-using namespace NetworkInterfaces;
+#ifndef _WINDOWS
+#include <netinet/tcp.h>
+#endif
+
+using namespace TcpNetworkInterfaces;
 
 // *************************************************************************************************
 
@@ -72,6 +76,7 @@ NetworkInterface::NetworkInterface(int fileDescriptor)
     , m_buffer(NULL)
     , m_bufferSize(0)
 {
+
     UpdatePeerNameInternal();
 }
 
@@ -107,6 +112,13 @@ NetworkInterface NetworkInterface::Accept()
     struct sockaddr_in remoteAddress;
     socklen_t size = sizeof(remoteAddress);
 
+    int optval = 1;
+    int result = setsockopt(m_fileDescriptor, IPPROTO_TCP, TCP_NODELAY, (char*)&optval, sizeof(int));
+    if (result < 0)
+    {
+        LOG_ERROR << "Cannot accept incoming connection: " << strerror(errno) << std::endl;
+        exit(1);
+    }
     int fileDescriptor = accept(m_fileDescriptor, (struct sockaddr*)&remoteAddress, &size);
     if (fileDescriptor <= 0)
     {
@@ -120,7 +132,7 @@ NetworkInterface NetworkInterface::Accept()
 
 bool NetworkInterface::SendString(const std::string& text)
 {
-    LOG_DEBUG << "Sending text: " << PlainStr(text) << std::endl;
+    LOG_VERBOSE << "Sending text: " << PlainStr(text) << std::endl;
     return SendBuffer(text.c_str(), text.size());
 }
 

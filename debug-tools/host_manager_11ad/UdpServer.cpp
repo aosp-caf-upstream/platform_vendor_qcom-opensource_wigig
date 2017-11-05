@@ -28,7 +28,6 @@
  */
 
 #include "UdpServer.h"
-#include "UdpTempOsAbstruction.h"
 #include "CommandsHandler.h"
 #include "Host.h"
 
@@ -42,7 +41,7 @@ UdpServer::UdpServer(unsigned int udpPortIn, unsigned int udpPortOut, Host& host
 {
     try
     {
-        m_pSocket.reset(new UdpSocket(m_broadcastIp, udpPortIn, udpPortOut));
+        m_pSocket.reset(new UdpNetworkInterface(m_broadcastIp, udpPortIn, udpPortOut));
     }
     catch (string error)
     {
@@ -53,7 +52,7 @@ UdpServer::UdpServer(unsigned int udpPortIn, unsigned int udpPortOut, Host& host
 
 void UdpServer::StartServer()
 {
-    if (UdpTempOsAbstruction::LOCAL_HOST_IP == m_broadcastIp)
+    if (FileSystemOsAbstraction::LOCAL_HOST_IP == m_broadcastIp)
     {
         LOG_WARNING << "Can't start UDP server due to invalid host's IP/ broadcast IP";
         return;
@@ -72,6 +71,7 @@ void UdpServer::Stop()
     LOG_INFO << "Stopping the UDP server" << endl;
     m_pSocket->Close();
     m_pSocket.reset();
+    m_running = false;
 }
 
 void UdpServer::BlockingReceive()
@@ -88,7 +88,7 @@ void UdpServer::BlockingReceive()
             SendBroadcastMessage(referencedResponse);
         }
 
-    } while (true);
+    } while (m_running);
 }
 
 void UdpServer::SendBroadcastMessage(ResponseMessage responseMessage)

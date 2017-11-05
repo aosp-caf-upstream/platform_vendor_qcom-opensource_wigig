@@ -27,70 +27,24 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "OsHandler.h"
-#include <memory>
-#include <iostream> //TODO - maybe to remove
-#ifdef __OS3__
-#include <sys/signal.h>
-#endif
-#include "Host.h"
-using namespace std; //TODO - maybe to remove
+#ifndef _VERSION_INFO_H_
+#define _VERSION_INFO_H_
 
-#ifndef _WINDOWS
-void sig_quit_handler(int signum)
-{
-    if (signum == SIGQUIT || signum == SIGTSTP)
-    {
-        printf("Exiting host_manager_11ad as per user request\n");
-        Host::GetHost().StopHost();
-        exit(signum);
-    }
-    else if (signum == SIGPIPE)
-    {
-        //printf("Connection lost\n");
-    }
-}
-#endif
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
 
-// *************************************************************************************************
+// The only place for version definition/editing
+#define TOOL_VERSION_MAJOR 1
+#define TOOL_VERSION_MINOR 1
+#define TOOL_VERSION_MAINT 0
+#define TOOL_VERSION_INTERM 6
 
-void OsHandler::HandleOsSignals()
-{
-#ifndef _WINDOWS
-    //LOG_INFO << "Handle linux SIQQUIT signal" << endl;
-    signal(SIGQUIT, sig_quit_handler);
-    signal(SIGPIPE, sig_quit_handler);
-    signal(SIGTSTP, sig_quit_handler);
-#endif
+#define TOOL_VERSION            TOOL_VERSION_MAJOR,TOOL_VERSION_MINOR,TOOL_VERSION_MAINT,TOOL_VERSION_INTERM
+#define TOOL_VERSION_STR        STR(TOOL_VERSION_MAJOR.TOOL_VERSION_MINOR.TOOL_VERSION_MAINT.TOOL_VERSION_INTERM)
 
-}
+#define TOOL_FILE_DESCRIPTION   "Host Manager 11ad"
+#define TOOL_INTERNAL_NAME      "Host Manager 11ad"
+#define TOOL_ORIGINAL_FILE_NAME "host_manager_11ad.exe"
+#define TOOL_PRODUCT_NAME       "Host Manager 11ad"
 
-// *************************************************************************************************
-
-void OsHandler::OsSleep(int sleep_period)
-{
-#ifdef _WINDOWS
-    Sleep(sleep_period);
-#else
-    usleep(sleep_period * SECOND_IN_MILLISECONDS);
-#endif
-}
-
-//void OsHandler::OsError(const char* error_message, ...)
-//{
-//    va_list argptr;
-//    va_start(argptr, error_message);
-//
-//#ifdef _WINDOWS
-//    vfprintf(stderr, error_message, argptr);
-//
-//    exit(0);
-//#else
-//    vfprintf(stderr, error_message, argptr);
-//
-//    exit(0);
-//#endif
-//
-//    va_end(argptr);
-//}
-
+#endif // _VERSION_INFO_H_

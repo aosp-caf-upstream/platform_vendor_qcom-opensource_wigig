@@ -27,35 +27,55 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _OSHANDLER_H_
-#define _OSHANDLER_H_
+#ifndef _LOG_COLLECTOR_CONFIGURATION_H
+#define _LOG_COLLECTOR_CONFIGURATION_H
+#pragma once
 
+#include <chrono>
+#include <string>
+#include <map>
+#include <algorithm>
+#include <string>
+#include "FileSystemOsAbstraction.h"
+#include "LogCollectorDefinitions.h"
+using namespace std;
 
-
-// *************************************************************************************************
-
-/*
-* Class handling specific OS implementations
-*/
-class OsHandler
+namespace log_collector
 {
-public:
+    struct LogCollectorConfiguration
+    {
+    public:
 
-    /*
-    * Function to handle os signals - mostly relevant for linux os.
-    */
-    void HandleOsSignals();
+        void ResetValue()
+        {
+            m_pollingIntervalMs = chrono::milliseconds(100);
+            m_recordToFile = false;
+            m_fileFragmentSize = MAX_FILE_FRAGMENT_SIZE;
+            m_logFileSuffix = "";
+            m_logType = CPU_TYPE_FW;
+            for (auto& module : m_modulesVerbosity)
+            {
+                module.verbose_level_enable = 0;
+                module.info_level_enable = 1;
+                module.error_level_enable = 1;
+                module.warn_level_enable = 1;
+                module.reserved0 = 0;
+            }
+        }
 
-    /*
-    * OS agnostic sleep function
-    */
-    static void OsSleep(int sleep_period);
+        LogCollectorConfiguration()
+        {
+            ResetValue();
+        }
 
-    /*
-    * OS agnostic error print function
-    */
-    static void OsError(const char* error_message, ...);
-};
+        std::chrono::milliseconds m_pollingIntervalMs; // interval between two consecutive log polling in milliseconsd
+        bool m_recordToFile;
+        int m_fileFragmentSize;
+        string m_logFileSuffix;
+        CpuType m_logType;
+        module_level_enable m_modulesVerbosity[NUM_MODULES];
+    };
+}
+#endif // ! _LOG_COLLECTOR_CONFIGURATION_H
 
-#endif // _OSHANDLER_H_
 

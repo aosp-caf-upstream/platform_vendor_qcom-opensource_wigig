@@ -60,7 +60,7 @@ public:
     /*
      * StratHost starts each one of the servers it holds
      */
-    void StartHost(unsigned int commandsTcpPort, unsigned int eventsTcpPort, unsigned int udpPortIn, unsigned int udpPortOut);
+    void StartHost(unsigned int commandsTcpPort, unsigned int eventsTcpPort, unsigned int udpPortIn, unsigned int udpPortOut, unsigned int httpPort);
 
     /*
      * StopHost stops each one of the servers it holds
@@ -68,11 +68,15 @@ public:
     void StopHost();
 
     HostInfo& GetHostInfo() { return m_hostInfo; }
+    bool GetHostUpdate(HostData& data);
 
     DeviceManager& GetDeviceManager() { return m_deviceManager;  }
 
     // Push the given event through Events TCP Server
     void PushEvent(const HostManagerEventBase& event) const;
+
+    // Decide whether to show host_manager menu
+    void SetMenuDisplay(bool menuDisplayOn);
 
     // delete copy Cnstr and assignment operator
     // keep public for better error message
@@ -87,9 +91,13 @@ private:
     HostInfo m_hostInfo;
     std::promise<void> m_eventsTCPServerReadyPromise;    // sync. of device manager with events TCP server creation
     DeviceManager m_deviceManager;                        // note: it should be defined after the promise passsed to its Cnstr
+    bool m_MenuDisplayOn;
 
     // define Cnstr to be private, part of Singleton pattern
     Host();
+
+    // Menu display function
+    void DisplayMenu();
 };
 
 

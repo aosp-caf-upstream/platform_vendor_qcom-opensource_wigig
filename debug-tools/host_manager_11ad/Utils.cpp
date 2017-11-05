@@ -33,6 +33,7 @@
 #include <stdexcept>
 #include <cstdlib>
 #include <algorithm>
+#include <fstream>
 
 #if _WINDOWS
 #define localtime_r(_Time, _Tm) localtime_s(_Tm, _Time)
@@ -81,31 +82,60 @@ vector<string> Utils::Split(string str, char delimiter)
 }
 
 // *************************************************************************************************
-string Utils::GetCurrentLocalTime()
+Utils::TimeStamp Utils::GetCurrentLocalTime()
 {
+    TimeStamp ts;
     chrono::system_clock::time_point nowTimePoint = chrono::system_clock::now(); // get current time
 
     // convert epoch time to struct with year, month, day, hour, minute, second fields
     time_t now = chrono::system_clock::to_time_t(nowTimePoint);
-    tm localTime;
-    localtime_r(&now, &localTime);
+    localtime_r(&now, &ts.m_localTime);
 
     // get milliseconds field
     const chrono::duration<double> tse = nowTimePoint.time_since_epoch();
-    chrono::seconds::rep milliseconds = chrono::duration_cast<std::chrono::milliseconds>(tse).count() % 1000;
+    ts.m_milliseconds = chrono::duration_cast<std::chrono::milliseconds>(tse).count() % 1000;
+    return ts;
+}
 
+
+// *************************************************************************************************
+string Utils::GetCurrentLocalTimeString()
+{
+
+    TimeStamp ts = Utils::GetCurrentLocalTime();
 
     ostringstream currentTime;
-    currentTime << (1900 + localTime.tm_year) << '-'
-                << std::setfill('0') << std::setw(2) << (localTime.tm_mon + 1) << '-'
-                << std::setfill('0') << std::setw(2) << localTime.tm_mday << ' '
-                << std::setfill('0') << std::setw(2) << localTime.tm_hour << ':'
-                << std::setfill('0') << std::setw(2) << localTime.tm_min << ':'
-                << std::setfill('0') << std::setw(2) << localTime.tm_sec << '.'
-                << std::setfill('0') << std::setw(3) << milliseconds;
+    currentTime << (1900 + ts.m_localTime.tm_year) << '-'
+                << std::setfill('0') << std::setw(2) << (ts.m_localTime.tm_mon + 1) << '-'
+                << std::setfill('0') << std::setw(2) << ts.m_localTime.tm_mday << ' '
+                << std::setfill('0') << std::setw(2) << ts.m_localTime.tm_hour << ':'
+                << std::setfill('0') << std::setw(2) << ts.m_localTime.tm_min << ':'
+                << std::setfill('0') << std::setw(2) << ts.m_localTime.tm_sec << '.'
+                << std::setfill('0') << std::setw(3) << ts.m_milliseconds;
 
     string currentTimeStr(currentTime.str());
     return currentTimeStr;
+}
+
+// *************************************************************************************************
+string Utils::GetCurrentLocalTimeXml()
+{
+    TimeStamp ts = Utils::GetCurrentLocalTime();
+
+    ostringstream timeStampBuilder;
+
+    timeStampBuilder << "<Log_Content>"
+        << "<Sample_Time>"
+        << "<Hour>" << ts.m_localTime.tm_hour << "</Hour>"
+        << "<Minute>" << ts.m_localTime.tm_min << "</Minute>"
+        << "<Second>" << ts.m_localTime.tm_sec << "</Second>"
+        << "<Milliseconds>" << ts.m_milliseconds << "</Milliseconds>"
+        << "<Day>" << ts.m_localTime.tm_mday << "</Day>"
+        << "<Month>" << ts.m_localTime.tm_mon + 1 << "</Month>"
+        << "<Year>" << ts.m_localTime.tm_year + 1900 << "</Year>"
+        << "</Sample_Time>";
+
+    return timeStampBuilder.str();
 }
 
 // *************************************************************************************************

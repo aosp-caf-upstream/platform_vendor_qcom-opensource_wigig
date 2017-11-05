@@ -48,7 +48,9 @@ public:
 
     static vector<string> Split(string str, char delimiter);
 
-    static string GetCurrentLocalTime();
+    static string GetCurrentLocalTimeString();
+
+    static string GetCurrentLocalTimeXml();
 
     static bool ConvertHexStringToDword(string str, DWORD& word);
 
@@ -64,6 +66,15 @@ public:
     const static string JTAG;
     const static string SERIAL;
     const static string DUMMY;
+
+private:
+    struct TimeStamp
+    {
+        tm m_localTime; // year, month, day, hour, minutes, seconds
+        chrono::seconds::rep m_milliseconds;
+    };
+
+    static TimeStamp GetCurrentLocalTime();
 };
 
 #endif // !_UTILS_H_

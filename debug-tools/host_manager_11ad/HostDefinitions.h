@@ -30,11 +30,39 @@
 #ifndef _DEFINITIONS_H_
 #define _DEFINITIONS_H_
 
+#include <map>
 #include <string>
 #include <cstdint>
 #include <tuple>
 #include "Utils.h"
 
+// FW Defines
+#define MAX_RF_NUMBER 8
+
+
+#define FW_ASSERT_REG 0x91F020
+#define UCODE_ASSERT_REG 0x91F028
+#define FW_ASSOCIATION_REG 0x880A44
+#define FW_ASSOCIATED_VALUE 0x6
+#define MCS_REG 0x880A60
+#define DEVICE_TYPE_REG 0x880A8C
+#define FW_MODE_REG 0x880A34
+#define BOOT_LOADER_VERSION_REG 0x880A0C
+#define CHANNEL_REG 0x883020
+#define BOARDFILE_REG 0x880014
+
+#define UCODE_RX_ON_REG 0x9405BE
+#define BF_SEQ_REG 0x941374
+#define BF_TRIG_REG 0x941380
+#define NAV_REG 0x940490
+#define TX_GP_REG 0x880A58
+#define RX_GP_REG 0x880A5C
+
+#define RF_CONNECTED_REG 0x889488
+#define RF_ENABLED_REG 0x889488
+
+#define BASEBAND_TEMPERATURE_REG 0x91c808
+#define RF_TEMPERATURE_REG 0x91c80c
 
 // *************************************************************************************************
 /*
@@ -70,6 +98,22 @@ struct ResponseMessage
     unsigned inputBufSize;
 };
 
+// *************************************************************************************************
+/* A response to the user in CLI mode
+*/
+struct Status
+{
+    Status() :
+        m_success(true),
+        m_message("") {}
+
+    Status(bool success, std::string message) :
+        m_success(success),
+        m_message(message) {}
+
+    bool m_success;
+    std::string m_message;
+};
 
 // *************************************************************************************************
 /*
@@ -123,14 +167,14 @@ struct FwTimestamp
     }
 };
 
-enum DRIVER_MODE
-{
-    IOCTL_WBE_MODE,
-    IOCTL_WIFI_STA_MODE,
-    IOCTL_WIFI_SOFTAP_MODE,
-    IOCTL_CONCURRENT_MODE,    // This mode is for a full concurrent implementation  (not required mode switch between WBE/WIFI/SOFTAP)
-    IOCTL_SAFE_MODE,          // A safe mode required for driver for protected flows like upgrade and crash dump...
-};
+//enum DRIVER_MODE
+//{
+//    IOCTL_WBE_MODE,
+//    IOCTL_WIFI_STA_MODE,
+//    IOCTL_WIFI_SOFTAP_MODE,
+//    IOCTL_CONCURRENT_MODE,    // This mode is for a full concurrent implementation  (not required mode switch between WBE/WIFI/SOFTAP)
+//    IOCTL_SAFE_MODE,          // A safe mode required for driver for protected flows like upgrade and crash dump...
+//};
 
 // *************************************************************************************************
 
@@ -161,5 +205,7 @@ enum ServerType
     stTcp,
     stUdp
 };
+
+const int SECOND_IN_MILLISECONDS = 1000;
 
 #endif // !_DEFINITIONS_H_

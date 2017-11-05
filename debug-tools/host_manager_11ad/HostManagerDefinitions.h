@@ -27,35 +27,28 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _OSHANDLER_H_
-#define _OSHANDLER_H_
+#ifndef _HOST_MANAGER_DEFINITIONS_H
+#define _HOST_MANAGER_DEFINTSIONS_H
+#pragma once
 
+#include <map>
 
-
-// *************************************************************************************************
-
-/*
-* Class handling specific OS implementations
-*/
-class OsHandler
+typedef enum BasebandTypeEnum
 {
-public:
+    BASEBAND_TYPE_NONE,
+    BASEBAND_TYPE_SPARROW,   // added here to keep backward compatibility. some tools assume MARLON == 2, we don't brake this assumption
+    BASEBAND_TYPE_MARLON,
+    BASEBAND_TYPE_TALYN,
+    BASEBAND_TYPE_LAST
+} BasebandType;
 
-    /*
-    * Function to handle os signals - mostly relevant for linux os.
-    */
-    void HandleOsSignals();
-
-    /*
-    * OS agnostic sleep function
-    */
-    static void OsSleep(int sleep_period);
-
-    /*
-    * OS agnostic error print function
-    */
-    static void OsError(const char* error_message, ...);
+enum CpuType
+{
+    CPU_TYPE_FW,
+    CPU_TYPE_UCODE
 };
 
-#endif // _OSHANDLER_H_
+static std::map<CpuType, std::string> CPU_TYPE_TO_STRING = { { CPU_TYPE_FW, "FW" },{ CPU_TYPE_UCODE, "UCODE" } };
+static std::map<std::string, CpuType> STRING_TO_CPU_TYPE = { {"FW", CPU_TYPE_FW}, {"UCODE", CPU_TYPE_UCODE} };
 
+#endif // !_HOST_MANAGER_DEFINITIONS_H

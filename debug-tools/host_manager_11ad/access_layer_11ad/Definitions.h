@@ -30,17 +30,9 @@
 #ifndef _11AD_ACCESS_LAYER_DEFINITIONS_H_
 #define _11AD_ACCESS_LAYER_DEFINITIONS_H_
 
+#include "../HostManagerDefinitions.h"
+
 #define BAUD_RATE_REGISTER 0x880050
-
-
-typedef enum BasebandTypeEnum
-{
-    BASEBAND_TYPE_NONE,
-    BASEBAND_TYPE_SPARROW,   // added here to keep backward compatibility. some tools assume MARLON == 2, we don't brake this assumption
-    BASEBAND_TYPE_MARLON,
-    BASEBAND_TYPE_TALYN,
-    BASEBAND_TYPE_LAST
-} BasebandType;
 
 enum DeviceType
 {

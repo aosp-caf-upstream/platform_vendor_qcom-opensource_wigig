@@ -29,7 +29,7 @@
 
 #include <thread>
 #include "CommandsTcpServer.h"
-#include "NetworkInterface.h"
+#include "TcpNetworkInterface.h"
 #include "FileReader.h"
 #include "Host.h"
 
@@ -38,7 +38,7 @@ using namespace std;
 // *************************************************************************************************
 
 CommandsTcpServer::CommandsTcpServer(unsigned int commandsTcpPort, Host& host)
-    :m_port(commandsTcpPort),m_pSocket(new NetworkInterfaces::NetworkInterface()), m_host(host)
+    :m_port(commandsTcpPort),m_pSocket(new TcpNetworkInterfaces::NetworkInterface()), m_host(host), m_running(true)
 {
 }
 
@@ -52,7 +52,7 @@ void CommandsTcpServer::Start()
 
     //Infinite loop that waits for clients to connect to the commands TCP server - there's no reason to stop this loop,
     //should run forever unless there is a problem
-    while (true)
+    while (m_running)
     {
         try
         {
@@ -64,31 +64,29 @@ void CommandsTcpServer::Start()
         {
             LOG_ERROR << "Couldn't make a new connection or starting a new thread in Commands TCP server for a new client " << e.what() << endl;
         }
-
     }
 }
 
 void CommandsTcpServer::Stop()
 {
     LOG_INFO << "Stopping the commands TCP server" << endl;
-    m_pSocket->Shutdown(2); //type 2 -> Acts like the close(), shutting down both input and output
+    m_pSocket->Close(); //type 2 -> Acts like the close(), shutting down both input and output
     m_pSocket.reset();
+    m_running = false;
 }
 
 
 
 // *************************************************************************************************
 //A thread function to handle each client that connects to the server
-void CommandsTcpServer::ServerThread(NetworkInterfaces::NetworkInterface client)
+void CommandsTcpServer::ServerThread(TcpNetworkInterfaces::NetworkInterface client)
 {
     unique_ptr<CommandsHandler> pCommandsHandler(new CommandsHandler(stTcp, m_host));
     ConnectionStatus keepConnectionAliveFromCommand = KEEP_CONNECTION_ALIVE; //A flag for the content of the command - says if the client wants to close connection
     ConnectionStatus keepConnectionAliveFromReply = KEEP_CONNECTION_ALIVE; //A flag for the reply status, for problems in sending reply etc..
-    //TODO: uncomment when DMTools side is ready
-    // notify that new clinet is connected to the host (send list of connected users before the new one, and notification of the new one - true means connected, false diconnected)
-    Host::GetHost().PushEvent(ClientConnectionEvent(Host::GetHost().GetHostInfo().GetConnectedUsers(), client.GetPeerName(), true));
+    // notify that new clinet is connected to the host (send list of connected users before adding the new one, and a notification of the new one)
+    Host::GetHost().PushEvent(ClientConnectedEvent(Host::GetHost().GetHostInfo().GetConnectedUsers(), client.GetPeerName()));
     m_host.GetHostInfo().AddNewConnectedUser(client.GetPeerName()); // add the user's to the host's connected users
-
 
     do
     {
@@ -124,7 +122,7 @@ void CommandsTcpServer::ServerThread(NetworkInterfaces::NetworkInterface client)
                 //Reply back to the client an answer for his command. If it wasn't successful - close the connection
                 keepConnectionAliveFromReply = CommandsTcpServer::Reply(client, referencedResponse);
             }
-            //LOG_INFO << "Message from Client to commands TCP server: " << message << endl;
+            //LOG_VERBOSE << "Message from Client to commands TCP server: " << message << endl;
         }
         catch (exception e)
         {
@@ -138,18 +136,17 @@ void CommandsTcpServer::ServerThread(NetworkInterfaces::NetworkInterface client)
     //client.shutdown(1); //TODO - check how to do it correctly (without exception)
     //client.close(); //TODO - check how to do it correctly (without exception)
     LOG_INFO << "Closed connection with the client: " << client.GetPeerName() << endl;
-    m_host.GetHostInfo().RemoveNewConnectedUser(client.GetPeerName());
-    //TODO: uncomment when DMTools side is ready
-    //notify that new clinet is disconnected from the host
-    Host::GetHost().PushEvent(ClientConnectionEvent(Host::GetHost().GetHostInfo().GetConnectedUsers(), client.GetPeerName(), false));
+    m_host.GetHostInfo().RemoveConnectedUser(client.GetPeerName());
+    //notify that new client is disconnected from the host
+    Host::GetHost().PushEvent(ClientDisconnectedEvent(Host::GetHost().GetHostInfo().GetConnectedUsers(), client.GetPeerName()));
 
 }
 
 // *************************************************************************************************
 
-ConnectionStatus CommandsTcpServer::Reply(NetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage)
+ConnectionStatus CommandsTcpServer::Reply(TcpNetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage)
 {
-    LOG_DEBUG << "Reply is: " << responseMessage.message << endl;
+    LOG_VERBOSE << "Reply is: " << responseMessage.message << endl;
 
     switch (responseMessage.type)
     {
@@ -168,9 +165,9 @@ ConnectionStatus CommandsTcpServer::Reply(NetworkInterfaces::NetworkInterface &c
 
 // *************************************************************************************************
 
-ConnectionStatus CommandsTcpServer::ReplyBuffer(NetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage)
+ConnectionStatus CommandsTcpServer::ReplyBuffer(TcpNetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage)
 {
-    LOG_DEBUG << "Replying from a buffer (" << responseMessage.length << "B) Content: " << responseMessage.message << endl;
+    LOG_VERBOSE << "Replying from a buffer (" << responseMessage.length << "B) Content: " << responseMessage.message << endl;
 
     if (0 == responseMessage.length)
     {
@@ -192,11 +189,11 @@ ConnectionStatus CommandsTcpServer::ReplyBuffer(NetworkInterfaces::NetworkInterf
 //TODO - reply file had been copied from old "wilserver" almost without touching it.
 //It has to be checked and also modified to fit the new "host_server_11ad"
 //The same applies to "FileReader.h" and "FileReader.cpp"
-ConnectionStatus CommandsTcpServer::ReplyFile(NetworkInterfaces::NetworkInterface& client, ResponseMessage& fileName)
+ConnectionStatus CommandsTcpServer::ReplyFile(TcpNetworkInterfaces::NetworkInterface& client, ResponseMessage& fileName)
 {
     FileReader fileReader(fileName.message.c_str());
     size_t fileSize = fileReader.GetFileSize();
-    LOG_DEBUG << "Replying from a file: " << fileName.message
+    LOG_VERBOSE << "Replying from a file: " << fileName.message
               << " Size: " << fileSize << " B" << std::endl;
 
     if (0 == fileSize)
@@ -238,18 +235,18 @@ ConnectionStatus CommandsTcpServer::ReplyFile(NetworkInterfaces::NetworkInterfac
 
         if (fileReader.IsCompleted())
         {
-            LOG_DEBUG << "File Content successfully delivered" << std::endl;
+            LOG_VERBOSE << "File Content successfully delivered" << std::endl;
             return KEEP_CONNECTION_ALIVE;
         }
 
-        LOG_DEBUG << "File Chunk Delivered: " << chunkSize << "B" << std::endl;
+        LOG_VERBOSE << "File Chunk Delivered: " << chunkSize << "B" << std::endl;
     }
     while (chunkSize > 0);
 
     return KEEP_CONNECTION_ALIVE;
 }
 
-ConnectionStatus CommandsTcpServer::ReplyBinary(NetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage)
+ConnectionStatus CommandsTcpServer::ReplyBinary(TcpNetworkInterfaces::NetworkInterface &client, ResponseMessage &responseMessage)
 {
     if (0 == responseMessage.length)
     {

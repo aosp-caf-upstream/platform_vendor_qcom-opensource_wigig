@@ -27,21 +27,37 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <iostream>
 #include "HostInfo.h"
 #include "DebugLogger.h"
-#include "UdpTempOsAbstruction.h"
-#include <iostream>
+#include "FileSystemOsAbstraction.h"
+#include "VersionInfo.h"
 
-const string HostInfo::s_version = "1.1.3";
+// Version display is constructed using defines from VersionInfo.h which is updated automatically or manually during release
+// Note: cannot use Windows specific GetFileVersionInfo to extract the version
+const string HostInfo::s_version = TOOL_VERSION_STR;
 
 HostInfo::HostInfo() :
     m_alias(""),
-    m_persistencyPath(UdpTempOsAbstruction::GetPersistencyLocation() + "host_manager_11ad_host_info"),
-    m_aliasFileName(UdpTempOsAbstruction::GetDirectoriesDilimeter() + "host_alias"),
-    m_oldHostAliasFile(UdpTempOsAbstruction::GetPersistencyLocation() + "wigig_remoteserver_details"),
-    m_isAliasFileChanged(false)
+    m_persistencyPath(FileSystemOsAbstraction::GetConfigurationFilesLocation()),
+    m_aliasFileName(FileSystemOsAbstraction::GetDirectoriesDilimeter() + "host_alias"),
+    m_oldHostAliasFile(GetOldPersistencyLocation() + "host_manager_11ad_host_info"),
+    m_isAliasFileChanged(false),
+    m_capabilitiesMask(0)
 {
+    SetHostCapabilities();
     LoadHostInfo();
+}
+
+const string HostInfo::GetOldPersistencyLocation()
+{
+#ifdef __linux
+    return "/etc/";
+#elif __OS3__
+    return "/tmp/";
+#else
+    return "C:\\Temp\\"; // TODO: change
+#endif // __linux
 }
 
 const HostIps& HostInfo::GetIps()
@@ -58,94 +74,97 @@ string HostInfo::GetAlias()
     return m_alias;
 }
 
-bool HostInfo::SaveAliasToFile(string newAlias)
+bool HostInfo::SaveAliasToFile(const string& newAlias)
 {
-    m_persistencyLock.lock();
-    if (!UdpTempOsAbstruction::WriteFile(m_persistencyPath + m_aliasFileName, newAlias))
+    lock_guard<mutex> lock(m_persistencyLock);
+    if (!FileSystemOsAbstraction::WriteFile(m_persistencyPath + m_aliasFileName, newAlias))
     {
         LOG_WARNING << "Failed to write new alias to configuration file " << m_persistencyPath << m_aliasFileName << endl;
         return false;
     }
     m_isAliasFileChanged = true;
-    m_persistencyLock.unlock();
     return true;
 }
 
 bool HostInfo::UpdateAliasFromFile()
 {
-    m_persistencyLock.lock();
-    if (!UdpTempOsAbstruction::ReadFile(m_persistencyPath + m_aliasFileName, m_alias))
+    lock_guard<mutex> lock(m_persistencyLock);
+    if (!FileSystemOsAbstraction::ReadFile(m_persistencyPath + m_aliasFileName, m_alias))
     {
         LOG_WARNING << "Failed to write new alias to configuration file " << m_persistencyPath << m_aliasFileName << endl;
         return false;
     }
     m_isAliasFileChanged = false;
-    m_persistencyLock.unlock();
     return true;
 }
 
+set<string> HostInfo::GetConnectedUsers() const
+{
+    lock_guard<mutex> lock(m_connectedUsersLock);
+    return m_connectedUsers;
+}
 
-//void HostInfo::LoadHostInfo()
-//{
-//    m_ips = UdpTempOsAbstruction::GetHostIps();
-//
-//    bool res = UdpTempOsAbstruction::ReadFile(m_persistencyPath, m_alias);
-//    if (!res) // file doesn't exist
-//    {
-//        /*
-//        res = UdpTempOsAbstruction::CreateFile(m_persistencyPath)
-//        if (!res)
-//        {
-//            cout << "Failed to create persistency file" << endl;
-//            m_alias = "";
-//            return;
-//        }
-//        */
-//        res = UdpTempOsAbstruction::ReadHostOsAlias(m_alias);
-//        if (!res)
-//        {
-//            cout << "Failed to read OS host name" << endl;
-//            m_alias = "";
-//        }
-//        res = UdpTempOsAbstruction::WriteFile(m_persistencyPath, m_alias);
-//        if (!res)
-//        {
-//            cout << "Failed to write host alias to persistency" << endl;
-//        }
-//    }
-//}
+void HostInfo::AddNewConnectedUser(const string& user)
+{
+    lock_guard<mutex> lock(m_connectedUsersLock);
+    m_connectedUsers.insert(user);
+}
+
+void HostInfo::RemoveConnectedUser(const string& user)
+{
+    lock_guard<mutex> lock(m_connectedUsersLock);
+    m_connectedUsers.erase(user);
+}
+
+void HostInfo::SetHostCapabilities()
+{
+    //SetCapability(COLLECTING_LOGS, true); // TODO - reenable
+}
+
+void HostInfo::SetCapability(CAPABILITIES capability, bool isTrue)
+{
+    const DWORD mask = (DWORD)1 << capability;
+    m_capabilitiesMask = isTrue ? m_capabilitiesMask | mask : m_capabilitiesMask & ~mask;
+}
+
+bool HostInfo::IsCapabilitySet(CAPABILITIES capability) const
+{
+    return (m_capabilitiesMask & (DWORD)1 << capability) != (DWORD)0;
+}
 
 void HostInfo::LoadHostInfo()
 {
-    m_ips = UdpTempOsAbstruction::GetHostIps();
+    m_ips = FileSystemOsAbstraction::GetHostIps();
 
     // create host manager directory if doesn't exist
-    bool res = UdpTempOsAbstruction::IsFolderExists(m_persistencyPath);
+    bool res = FileSystemOsAbstraction::DoesFolderExist(m_persistencyPath);
     if (!res)
     {
-        res = UdpTempOsAbstruction::CreateFolder(m_persistencyPath);
+        res = FileSystemOsAbstraction::CreateFolder(m_persistencyPath);
         if (!res)
         {
             LOG_WARNING << "Failed to create " << m_persistencyPath << " directory" << endl;
             return;
         }
         // backward compatibility - copy the alias that the user already given to its new place
-        if (UdpTempOsAbstruction::IsFileExists(m_oldHostAliasFile))
+        if (FileSystemOsAbstraction::IsFileExists(m_oldHostAliasFile)
+            && !FileSystemOsAbstraction::MoveFileToNewLocation(m_oldHostAliasFile, m_persistencyPath + m_aliasFileName))
         {
-            UdpTempOsAbstruction::MoveFileToNewLocation(m_oldHostAliasFile, m_persistencyPath + m_aliasFileName);
+            LOG_WARNING << "Failed to move " << m_oldHostAliasFile << " file to new location " << m_persistencyPath + m_aliasFileName << endl;
+            return;
         }
     }
 
-    res = UdpTempOsAbstruction::ReadFile(m_persistencyPath + m_aliasFileName, m_alias);
+    res = FileSystemOsAbstraction::ReadFile(m_persistencyPath + m_aliasFileName, m_alias);
     if (!res) // file doesn't exist
     {
-        res = UdpTempOsAbstruction::ReadHostOsAlias(m_alias);
+        res = FileSystemOsAbstraction::ReadHostOsAlias(m_alias);
         if (!res)
         {
             LOG_WARNING << "Failed to read OS host name" << endl;
             m_alias = "";
         }
-        res = UdpTempOsAbstruction::WriteFile(m_persistencyPath + m_aliasFileName, m_alias);
+        res = FileSystemOsAbstraction::WriteFile(m_persistencyPath + m_aliasFileName, m_alias);
         if (!res)
         {
             LOG_WARNING << "Failed to write host alias to persistency" << endl;

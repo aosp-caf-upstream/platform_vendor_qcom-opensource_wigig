@@ -74,7 +74,7 @@ public:
     @param: string - the new alias
     @return: bool - operation status - true for success, false otherwise
     */
-    bool SaveAliasToFile(string newAlias);
+    bool SaveAliasToFile(const string& newAlias);
 
     /*
     UpdateAliasFromFile
@@ -90,7 +90,7 @@ public:
     @param: none
     @return: set<string> of all connected users
     */
-    const set<string>& GetConnectedUsers() { return m_connectedUsers;  }
+    set<string> GetConnectedUsers() const;
 
     /*
     AddNewConnectedUser
@@ -98,7 +98,7 @@ public:
     @param: string - a new user (currently the user's DmTools's IP. TODO: change to the user's personal host's name or user's DmTools username)
     @return: none
     */
-    void AddNewConnectedUser(string user) { m_connectedUsers.insert(user); }
+    void AddNewConnectedUser(const string& user);
 
     /*
     RemoveConnectedUser
@@ -106,9 +106,17 @@ public:
     @param: string - a user (currently the user's DmTools's IP. TODO: change to the user's personal host's name or user's DmTools username)
     @return: none
     */
-    void RemoveNewConnectedUser(string user) { m_connectedUsers.erase(user); }
+    void RemoveConnectedUser(const string& user);
 
-    static string GetVersion() { return s_version;  }
+    static string GetVersion() { return s_version; }
+
+    /*
+    GetHostCapabilities
+    Get the capabilities of the host
+    @param: none
+    @return: bit mask of the capabilities
+    */
+    DWORD GetHostCapabilities() const { return m_capabilitiesMask; }
 
 private:
     HostIps m_ips; // host's network details // assumption: each host has only one IP address for ethernet interfaces
@@ -119,10 +127,28 @@ private:
     set<string> m_connectedUsers; // list of users IPs that have a connection to the commandsTcpServer // TODO: change to the user's personal host's name or user's DmTools username
     const static string s_version; // host_manager_11ad version
     atomic<bool> m_isAliasFileChanged; // when turned on indicates that m_alias contains stale information, so we need to update it from persistency
-    mutex m_persistencyLock; // only one thread is allowed to change persistency at a time
+    mutable mutex m_persistencyLock; // only one thread is allowed to change persistency at a time
+    mutable mutex m_connectedUsersLock;
+
+    // Capabilities:
+    DWORD m_capabilitiesMask;
+
+    // Enumeration of Host capabilities
+    // Note: This is a contract with DmTools, the order is important!
+    enum CAPABILITIES : DWORD
+    {
+        COLLECTING_LOGS // capability of host manager to collect logs by itself and send them to DmTools
+    };
+
+    void SetHostCapabilities();
+    void SetCapability(CAPABILITIES capability, bool isTrue);
+    bool IsCapabilitySet(CAPABILITIES capability) const;
 
     // load host's info from persistency and ioctls
     void LoadHostInfo();
+
+    // For backward compatibility (should be removed in next releases)
+    const string GetOldPersistencyLocation();
 };
 
 

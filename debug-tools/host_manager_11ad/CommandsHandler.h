@@ -62,7 +62,6 @@ public:
     ConnectionStatus ExecuteBinaryCommand(uint8_t* binaryInput, ResponseMessage &referencedResponse);
 
 private:
-    shared_ptr<MessageParser> m_pMessageParser;
     //m_functionHandler is a map that maps a string = command name, to a function
     map<string, pCommandFunction> m_functionHandler;
     Host& m_host; // a refernce to the host (enables access to deviceManager and hostInfo)
@@ -77,27 +76,7 @@ private:
         chrsSuccess
     };
 
-    string GetCommandsHandlerResponseStatusString(CommandsHandlerResponseStatus status)
-    {
-        switch (status)
-        {
-        case chrsInvalidNumberOfArguments:
-            return "Invalid arguments number";
-        case chrsInvalidArgument:
-            return "Invalid argument type";
-        case chrsOperationFailure:
-            return "Operation failure";
-        case chrsLinuxSupportOnly:
-            return "Linux support only";
-        case chrsSuccess:
-            return "Success";
-        case chrsDeviceIsSilent:
-            return "SilentDevice";
-
-        default:
-            return "CommandsHandlerResponseStatus is unknown";
-        }
-    }
+    string GetCommandsHandlerResponseStatusString(CommandsHandlerResponseStatus status);
 
     /*
       FormatResponseMessage
@@ -145,23 +124,19 @@ private:
 
     ResponseMessage DriverControl(vector<string> arguments, unsigned int numberOfArguments);
 
+    ResponseMessage DriverCommand(vector<string> arguments, unsigned int numberOfArguments);
+
     ResponseMessage GenericDriverIO(vector<string> arguments, void* inputBuf, unsigned int inputBufSize);
 
     ResponseMessage GetDeviceSilenceMode(vector<string> arguments, unsigned int numberOfArguments);
 
     ResponseMessage SetDeviceSilenceMode(vector<string> arguments, unsigned int numberOfArguments);
 
-    bool ValidArgumentsNumber(string functionName, size_t numberOfArguments, size_t expectedNumOfArguments, string& responseMessage)
-    {
-        if (expectedNumOfArguments != numberOfArguments)
-        {
-            stringstream error;
-            LOG_WARNING << "Mismatching number of arguments in " << functionName << ": expected " << expectedNumOfArguments << " but got "<< numberOfArguments << endl;
-            responseMessage = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsInvalidNumberOfArguments));
-            return false;
-        }
-        return true;
-    }
+    ResponseMessage GetConnectedUsers(vector<string> arguments, unsigned int numberOfArguments);
+
+    ResponseMessage GetDeviceCapabilities(vector<string> arguments, unsigned int numberOfArguments);
+
+    bool ValidArgumentsNumber(string functionName, size_t numberOfArguments, size_t expectedNumOfArguments, string& responseMessage);
 
     /*
       GetHostNetworkInfo
@@ -180,6 +155,10 @@ private:
     ResponseMessage SetHostAlias(vector<string> arguments, unsigned int numberOfArguments);
 
     ResponseMessage GetHostAlias(vector<string> arguments, unsigned int numberOfArguments);
+
+    ResponseMessage GetHostCapabilities(vector<string> arguments, unsigned int numberOfArguments);
+
+    ResponseMessage OnTargetLogRecording(vector<string> arguments, unsigned int numberOfArguments);
 
     const char m_device_delimiter = ' ';
 

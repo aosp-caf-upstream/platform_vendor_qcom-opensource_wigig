@@ -27,18 +27,64 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sstream>
+#include <string>
+#include <set>
 #include "CommandsHandler.h"
 #include "Host.h"
 #include "HostDefinitions.h"
 #include "FileReader.h"
+#include "JsonSerializeHelper.h"
 
-#include <sstream>
-#include <string>
+#ifdef _WINDOWS
+#include "ioctl_if.h"
+#endif
+
+CommandsHandler::CommandsHandler(ServerType type, Host& host) :
+    m_host(host)
+{
+    if (stTcp == type) // TCP server
+    {
+        m_functionHandler.insert(make_pair("get_interfaces", &CommandsHandler::GetInterfaces));
+        m_functionHandler.insert(make_pair("open_interface", &CommandsHandler::OpenInterface));
+        m_functionHandler.insert(make_pair("close_interface", &CommandsHandler::CloseInterface));
+        m_functionHandler.insert(make_pair("r", &CommandsHandler::Read));
+        m_functionHandler.insert(make_pair("rb", &CommandsHandler::ReadBlock));
+        m_functionHandler.insert(make_pair("w", &CommandsHandler::Write));
+        m_functionHandler.insert(make_pair("wb", &CommandsHandler::WriteBlock));
+        m_functionHandler.insert(make_pair("interface_reset", &CommandsHandler::InterfaceReset));
+        m_functionHandler.insert(make_pair("sw_reset", &CommandsHandler::SwReset));
+        m_functionHandler.insert(make_pair("alloc_pmc", &CommandsHandler::AllocPmc));
+        m_functionHandler.insert(make_pair("dealloc_pmc", &CommandsHandler::DeallocPmc));
+        m_functionHandler.insert(make_pair("create_pmc_file", &CommandsHandler::CreatePmcFile));
+        m_functionHandler.insert(make_pair("read_pmc_file", &CommandsHandler::FindPmcFile));
+        m_functionHandler.insert(make_pair("send_wmi", &CommandsHandler::SendWmi));
+        m_functionHandler.insert(make_pair("set_host_alias", &CommandsHandler::SetHostAlias));
+        m_functionHandler.insert(make_pair("get_host_alias", &CommandsHandler::GetHostAlias));
+        m_functionHandler.insert(make_pair("get_time", &CommandsHandler::GetTime));
+        m_functionHandler.insert(make_pair("set_local_driver_mode", &CommandsHandler::SetDriverMode));
+        m_functionHandler.insert(make_pair("get_host_manager_version", &CommandsHandler::GetHostManagerVersion));
+        m_functionHandler.insert(make_pair("driver_control", &CommandsHandler::DriverControl));
+        m_functionHandler.insert(make_pair("driver_command", &CommandsHandler::DriverCommand));
+        m_functionHandler.insert(make_pair("set_silence_mode", &CommandsHandler::SetDeviceSilenceMode));
+        m_functionHandler.insert(make_pair("get_silence_mode", &CommandsHandler::GetDeviceSilenceMode));
+        m_functionHandler.insert(make_pair("get_connected_users", &CommandsHandler::GetConnectedUsers));
+        m_functionHandler.insert(make_pair("get_device_capabilities_mask", &CommandsHandler::GetDeviceCapabilities));
+        m_functionHandler.insert(make_pair("get_host_capabilities_mask", &CommandsHandler::GetHostCapabilities));
+        m_functionHandler.insert(make_pair("on_target_log_recording", &CommandsHandler::OnTargetLogRecording));
+    }
+    else // UDP server
+    {
+        m_functionHandler.insert(make_pair(/*"get_host_network_info"*/"GetHostIdentity", &CommandsHandler::GetHostNetworkInfo));
+    }
+}
+
+// *************************************************************************************************
 
 string CommandsHandler::DecorateResponseMessage(bool successStatus, string message)
 {
     string status = successStatus ? "Success" : "Fail";
-    string decoratedResponse = Utils::GetCurrentLocalTime() + m_reply_feilds_delimiter + status;
+    string decoratedResponse = Utils::GetCurrentLocalTimeString() + m_reply_feilds_delimiter + status;
     if (message != "")
     {
         decoratedResponse += m_reply_feilds_delimiter + message;
@@ -629,6 +675,84 @@ ResponseMessage CommandsHandler::GetHostAlias(vector<string> arguments, unsigned
 }
 // *************************************************************************************************
 
+ResponseMessage CommandsHandler::GetHostCapabilities(vector<string> arguments, unsigned int numberOfArguments)
+{
+    LOG_VERBOSE << __FUNCTION__ << endl;
+    ResponseMessage response;
+
+    if (ValidArgumentsNumber(__FUNCTION__, numberOfArguments, 0, response.message))
+    {
+        stringstream message;
+        message << m_host.GetHostInfo().GetHostCapabilities();
+        response.message = DecorateResponseMessage(true, message.str());
+    }
+    response.type = REPLY_TYPE_BUFFER;
+    response.length = response.message.size();
+    return response;
+}
+// *************************************************************************************************
+
+ResponseMessage CommandsHandler::OnTargetLogRecording(vector<string> arguments, unsigned int numberOfArguments)
+{
+    LOG_VERBOSE << __FUNCTION__ << endl;
+    ResponseMessage response;
+
+    if (ValidArgumentsNumber(__FUNCTION__, numberOfArguments, 4, response.message)) // arg0 - devices names, arg1 - cpu types, arg2 - operation, arg3 - parameter, arg4 - value
+    {
+        vector<string> deviceNames = Utils::Split(arguments[0], ',');
+        vector<string> cpuNames = Utils::Split(arguments[1], ',');
+
+        if ("start" == arguments[2]) // currently start and stop are done for all devices and cpus
+        {
+            if (m_host.GetDeviceManager().GetLogCollectionMode())
+            {
+                response.message = DecorateResponseMessage(false, "already recording logs");
+            }
+            else
+            {
+                m_host.GetDeviceManager().SetLogCollectionMode(true);
+                response.message = DecorateResponseMessage(true);
+            }
+        }
+        else if ("stop" == arguments[2]) // currently start and stop are done for all devices and cpus
+        {
+            if (!m_host.GetDeviceManager().GetLogCollectionMode())
+            {
+                response.message = DecorateResponseMessage(false, "logs aren't being recorded");
+            }
+            else
+            {
+                m_host.GetDeviceManager().SetLogCollectionMode(false);
+                response.message = DecorateResponseMessage(true);
+            }
+        }
+        else if ("set_config" == arguments[2])
+        {
+            string errorMsg;
+            if (!m_host.GetDeviceManager().SetLogCollectionConfiguration(deviceNames, cpuNames, arguments[3], arguments[4], errorMsg))
+            {
+                response.message = DecorateResponseMessage(false, errorMsg);
+            }
+        }
+        else if ("get_config" == arguments[2])
+        {
+            response.message = DecorateResponseMessage(true, m_host.GetDeviceManager().GetLogCollectionConfiguration(deviceNames, cpuNames, arguments[3]));
+        }
+        else if ("dump_config" == arguments[2])
+        {
+            response.message = DecorateResponseMessage(true, m_host.GetDeviceManager().DumpLogCollectionConfiguration(deviceNames, cpuNames));
+        }
+        else
+        {
+            response.message = DecorateResponseMessage(false, " Unknown on target log recording operation");
+        }
+    }
+    response.type = REPLY_TYPE_BUFFER;
+    response.length = response.message.size();
+    return response;
+}
+// *************************************************************************************************
+
 ResponseMessage CommandsHandler::GetTime(vector<string> arguments, unsigned int numberOfArguments)
 {
     //do something with params
@@ -653,6 +777,7 @@ ResponseMessage CommandsHandler::SetDriverMode(vector<string> arguments, unsigne
     ResponseMessage response;
     if (ValidArgumentsNumber(__FUNCTION__, numberOfArguments, 2, response.message))
     {
+#ifdef _WINDOWS
         int newMode = IOCTL_WBE_MODE;
         int oldMode = IOCTL_WBE_MODE;
 
@@ -684,7 +809,10 @@ ResponseMessage CommandsHandler::SetDriverMode(vector<string> arguments, unsigne
             response.length = response.message.size();
             return response;
         }
-
+#else
+        int newMode = 0;
+        int oldMode = 0;
+#endif
         DeviceManagerOperationStatus status = m_host.GetDeviceManager().SetDriverMode(arguments[0], newMode, oldMode);
         if (dmosSuccess != status)
         {
@@ -692,6 +820,7 @@ ResponseMessage CommandsHandler::SetDriverMode(vector<string> arguments, unsigne
             response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
                 DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
         }
+#ifdef _WINDOWS
         else
         {
             string message;
@@ -719,6 +848,7 @@ ResponseMessage CommandsHandler::SetDriverMode(vector<string> arguments, unsigne
 
             response.message = DecorateResponseMessage(true, message);
         }
+#endif
     }
     response.type = REPLY_TYPE_BUFFER;
     response.length = response.message.size();
@@ -743,6 +873,48 @@ ResponseMessage CommandsHandler::GetHostManagerVersion(vector<string> arguments,
     return response;
 }
 // *************************************************************************************************
+
+ResponseMessage CommandsHandler::DriverCommand(vector<string> arguments, unsigned int numberOfArguments)
+{
+    ResponseMessage response;
+    if (ValidArgumentsNumber(__FUNCTION__, numberOfArguments, 5, response.message))
+    {
+        DWORD commandId, inBufSize, outBufSize;
+        std::vector<unsigned char> inputBuf;
+        if ( !(Utils::ConvertHexStringToDword(arguments[1], commandId)
+               && Utils::ConvertHexStringToDword(arguments[2], inBufSize)
+               && Utils::ConvertHexStringToDword(arguments[3], outBufSize)
+               && JsonSerializeHelper::Base64Decode(arguments[4], inputBuf)
+               && inputBuf.size() == inBufSize) ) // inBufSize is the size of the original binary buffer before Base64 encoding
+        {
+            response.message = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsInvalidArgument));
+        }
+        else
+        {
+            std::vector<unsigned char> outputBuf(outBufSize, 0);
+
+            DeviceManagerOperationStatus status =
+                m_host.GetDeviceManager().DriverControl(arguments[0], commandId, inputBuf.data(), inBufSize, outBufSize? outputBuf.data() : nullptr, outBufSize);
+
+            if (dmosSuccess != status)
+            {
+                LOG_DEBUG << "Driver IO command handler: Failed to execute driver IOCTL operation" << endl;
+                response.message = (dmosNoSuchConnectedDevice == status) ?
+                    DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
+                    DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+            }
+            else
+            {
+                LOG_DEBUG << "Driver IO command handler: Success" << endl;
+                response.message = DecorateResponseMessage(true, JsonSerializeHelper::Base64Encode(outputBuf)); // empty string if the buffer is empty
+            }
+        }
+    }
+
+    response.type = REPLY_TYPE_BUFFER;
+    response.length = response.message.size();
+    return response;
+}
 
 // *************************************************************************************************
 ResponseMessage CommandsHandler::DriverControl(vector<string> arguments, unsigned int numberOfArguments)
@@ -866,6 +1038,53 @@ ResponseMessage CommandsHandler::SetDeviceSilenceMode(vector<string> arguments, 
     response.length = response.message.size();
     return response;
 }
+
+ResponseMessage CommandsHandler::GetConnectedUsers(vector<string> arguments, unsigned int numberOfArguments)
+{
+    LOG_VERBOSE << __FUNCTION__ << endl;
+    ResponseMessage response;
+    if (ValidArgumentsNumber(__FUNCTION__, numberOfArguments, 0, response.message))
+    {
+
+        std::set<std::string> connectedUserList = m_host.GetHostInfo().GetConnectedUsers();
+        stringstream os;
+        for (const string & cl : connectedUserList)
+        {
+            os << cl << " ";
+        }
+
+        response.message = DecorateResponseMessage(true, os.str());
+    }
+    response.type = REPLY_TYPE_BUFFER;
+    response.length = response.message.size();
+    return response;
+
+}
+ResponseMessage CommandsHandler::GetDeviceCapabilities(vector<string> arguments, unsigned int numberOfArguments)
+{
+    LOG_VERBOSE << __FUNCTION__ << endl;
+    ResponseMessage response;
+    if (ValidArgumentsNumber(__FUNCTION__, numberOfArguments, 1, response.message))
+    {
+        DWORD deviceCapabilitiesMask;
+        DeviceManagerOperationStatus status = m_host.GetDeviceManager().GetDeviceCapabilities(arguments[0], deviceCapabilitiesMask);
+        if (dmosSuccess != status)
+        {
+            LOG_ERROR << "Error while trying to GetDeviceCapabilities at " << arguments[0] << ". Error: " + m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status) << endl;
+            response.message = (dmosNoSuchConnectedDevice == status) ? DecorateResponseMessage(false, m_host.GetDeviceManager().GetDeviceManagerOperationStatusString(status)) :
+                DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsOperationFailure));
+        }
+        else
+        {
+            stringstream message;
+            message << deviceCapabilitiesMask;
+            response.message = DecorateResponseMessage(true, message.str());
+        }
+    }
+    response.type = REPLY_TYPE_BUFFER;
+    response.length = response.message.size();
+    return response;
+}
 // *************************************************************************************************
 
 // **************************************UDP commands handlers*********************************************************** //
@@ -891,47 +1110,10 @@ ResponseMessage CommandsHandler::GetHostNetworkInfo(vector<string> arguments, un
 }
 // *************************************************************************************************
 
-CommandsHandler::CommandsHandler(ServerType type, Host& host) :
-    m_host(host)
-{
-    if (stTcp == type) // TCP server
-    {
-        m_functionHandler.insert(make_pair("get_interfaces", &CommandsHandler::GetInterfaces));
-        m_functionHandler.insert(make_pair("open_interface", &CommandsHandler::OpenInterface));
-        m_functionHandler.insert(make_pair("close_interface", &CommandsHandler::CloseInterface));
-        m_functionHandler.insert(make_pair("r", &CommandsHandler::Read));
-        m_functionHandler.insert(make_pair("rb", &CommandsHandler::ReadBlock));
-        m_functionHandler.insert(make_pair("w", &CommandsHandler::Write));
-        m_functionHandler.insert(make_pair("wb", &CommandsHandler::WriteBlock));
-        m_functionHandler.insert(make_pair("interface_reset", &CommandsHandler::InterfaceReset));
-        m_functionHandler.insert(make_pair("sw_reset", &CommandsHandler::SwReset));
-        m_functionHandler.insert(make_pair("alloc_pmc", &CommandsHandler::AllocPmc));
-        m_functionHandler.insert(make_pair("dealloc_pmc", &CommandsHandler::DeallocPmc));
-        m_functionHandler.insert(make_pair("create_pmc_file", &CommandsHandler::CreatePmcFile));
-        m_functionHandler.insert(make_pair("read_pmc_file", &CommandsHandler::FindPmcFile));
-        m_functionHandler.insert(make_pair("send_wmi", &CommandsHandler::SendWmi));
-        m_functionHandler.insert(make_pair("set_host_alias", &CommandsHandler::SetHostAlias));
-        m_functionHandler.insert(make_pair("get_host_alias", &CommandsHandler::GetHostAlias));
-        m_functionHandler.insert(make_pair("get_time", &CommandsHandler::GetTime));
-        m_functionHandler.insert(make_pair("set_local_driver_mode", &CommandsHandler::SetDriverMode));
-        m_functionHandler.insert(make_pair("get_host_manager_version", &CommandsHandler::GetHostManagerVersion));
-        m_functionHandler.insert(make_pair("driver_control", &CommandsHandler::DriverControl));
-        m_functionHandler.insert(make_pair("set_silence_mode", &CommandsHandler::SetDeviceSilenceMode));
-        m_functionHandler.insert(make_pair("get_silence_mode", &CommandsHandler::GetDeviceSilenceMode));
-    }
-    else // UDP server
-    {
-        m_functionHandler.insert(make_pair(/*"get_host_network_info"*/"GetHostIdentity", &CommandsHandler::GetHostNetworkInfo));
-    }
-}
-
-// *************************************************************************************************
-
 ConnectionStatus CommandsHandler::ExecuteCommand(string message, ResponseMessage &referencedResponse)
 {
-    m_pMessageParser.reset(new MessageParser(message));
-
-    string commandName = m_pMessageParser->GetCommandFromMessage();
+    MessageParser messageParser(message);
+    string commandName = messageParser.GetCommandFromMessage();
 
     if (m_functionHandler.find(commandName) == m_functionHandler.end())
     { //There's no such a command, the return value from the map would be null
@@ -941,7 +1123,7 @@ ConnectionStatus CommandsHandler::ExecuteCommand(string message, ResponseMessage
         referencedResponse.type = REPLY_TYPE_BUFFER;
         return KEEP_CONNECTION_ALIVE;
     }
-    referencedResponse = (this->*m_functionHandler[commandName])(m_pMessageParser->GetArgsFromMessage(), m_pMessageParser->GetNumberOfArgs()); //call the function that fits commandName
+    referencedResponse = (this->*m_functionHandler[commandName])(messageParser.GetArgsFromMessage(), messageParser.GetNumberOfArgs()); //call the function that fits commandName
 
     return KEEP_CONNECTION_ALIVE;
 }
@@ -955,3 +1137,40 @@ ConnectionStatus CommandsHandler::ExecuteBinaryCommand(uint8_t* binaryInput, Res
     return KEEP_CONNECTION_ALIVE;
 }
 
+// *************************************************************************************************
+
+string CommandsHandler::GetCommandsHandlerResponseStatusString(CommandsHandlerResponseStatus status)
+{
+    switch (status)
+    {
+    case chrsInvalidNumberOfArguments:
+        return "Invalid arguments number";
+    case chrsInvalidArgument:
+        return "Invalid argument type";
+    case chrsOperationFailure:
+        return "Operation failure";
+    case chrsLinuxSupportOnly:
+        return "Linux support only";
+    case chrsSuccess:
+        return "Success";
+    case chrsDeviceIsSilent:
+        return "SilentDevice";
+
+    default:
+        return "CommandsHandlerResponseStatus is unknown";
+    }
+}
+
+// *************************************************************************************************
+
+bool CommandsHandler::ValidArgumentsNumber(string functionName, size_t numberOfArguments, size_t expectedNumOfArguments, string& responseMessage)
+{
+    if (expectedNumOfArguments != numberOfArguments)
+    {
+        stringstream error;
+        LOG_WARNING << "Mismatching number of arguments in " << functionName << ": expected " << expectedNumOfArguments << " but got " << numberOfArguments << endl;
+        responseMessage = DecorateResponseMessage(false, GetCommandsHandlerResponseStatusString(chrsInvalidNumberOfArguments));
+        return false;
+    }
+    return true;
+}

@@ -30,6 +30,7 @@
 
 #include "ArgumentsParser.h"
 #include "HostInfo.h"
+#include "Host.h"
 
 #include <cstdio>
 #include <vector>
@@ -60,9 +61,13 @@ bool ArgumentsParser::ParseAndHandleArguments(int argc, char * argv[], unsigned 
 
     }
     if (DoesArgumentExist("-statusBar"))
-    { //Argument for setting the port of the commands TCP port
+    { //Argument for setting the textual status bar display
         printf("Showing Status Bar Periodically");
         g_LogConfig.SetStatusBarPrinter(true);
+    }
+    if (DoesArgumentExist("-menu"))
+    { //Argument for showing host_manager menu
+        Host::GetHost().SetMenuDisplay(true);
     }
 
     unsigned val;

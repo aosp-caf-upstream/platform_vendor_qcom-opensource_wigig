@@ -41,6 +41,7 @@ using namespace std;
 #define DEFAULT_EVENTS_TCP_SERVER_PORT 12339 //TODO - change back to 12347
 #define DEFAULT_UDP_SERVER_PORT_IN_GET_MESSAGE 12349 // This is a UDP port to get messages only from the remote server
 #define DEFAULT_REMOTE_UDP_SERVER_PORT_OUT_SEND_MESSAGE 12350 // This is the UDP port in the remote server to send messages only
+#define DEFAULT_HTTP_SERVER_PORT 3000 // This is the HTTP port for local web UI
 
 // *************************************************************************************************
 
@@ -54,6 +55,7 @@ int main(int argc, char* argv[])
         unsigned int eventsTcpPort = DEFAULT_EVENTS_TCP_SERVER_PORT;
         unsigned int udpPortIn = DEFAULT_UDP_SERVER_PORT_IN_GET_MESSAGE;
         unsigned int udpPortOut = DEFAULT_REMOTE_UDP_SERVER_PORT_OUT_SEND_MESSAGE;
+        unsigned int httpPort = DEFAULT_HTTP_SERVER_PORT;
 
         unique_ptr<ArgumentsParser> pArgumentsParser(new ArgumentsParser());
         //support to change by the user the commands TCP port only,events Tcp port UDP ports are not changeable by the user
@@ -67,7 +69,7 @@ int main(int argc, char* argv[])
 
             //Start Host object
             LOG_INFO << "Starting Host Manager" << endl;
-            Host::GetHost().StartHost(commandsTcpPort, eventsTcpPort, udpPortIn, udpPortOut);
+            Host::GetHost().StartHost(commandsTcpPort, eventsTcpPort, udpPortIn, udpPortOut, httpPort);
 
             LOG_INFO << "Stopping host_manager_11ad" << endl;
         }

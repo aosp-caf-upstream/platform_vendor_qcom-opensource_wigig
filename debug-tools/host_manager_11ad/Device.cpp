@@ -26,15 +26,51 @@
 * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+#include <map>
+
 #include "Device.h"
+#include "Host.h"
 
 Device::Device(const string& deviceName) :
     m_basebandType(BASEBAND_TYPE_NONE),
     m_driver(AccessLayer::OpenDriver(deviceName)),
     m_isSilent(false),
-    m_deviceName(deviceName)
+    m_deviceName(deviceName),
+    m_capabilitiesMask((DWORD)0)
 {
     m_isAlive = ReadDeviceFwInfoInternal(m_fwVersion, m_fwTimestamp);
+    if (m_isAlive)
+    {
+        RegisterDriverControlEvents();
+    }
+}
+
+bool Device::Init()
+{
+    // log collector initialization
+    m_logCollectors.clear();
+    unique_ptr<log_collector::LogCollector> fwTracer(new log_collector::LogCollector(this, CPU_TYPE_FW));
+    m_logCollectors.insert(make_pair(CPU_TYPE_FW, move(fwTracer)));
+    unique_ptr<log_collector::LogCollector> ucodeTracer(new log_collector::LogCollector(this, CPU_TYPE_UCODE));
+    m_logCollectors.insert(make_pair(CPU_TYPE_UCODE, move(ucodeTracer)));
+
+    if (Host::GetHost().GetDeviceManager().GetLogCollectionMode())
+    {
+        StartLogCollector();
+    }
+
+    return true;
+}
+
+bool Device::Fini()
+{
+    if (Host::GetHost().GetDeviceManager().GetLogCollectionMode())
+    {
+        StopLogCollector();
+    }
+    m_logCollectors.clear();
+    return true;
 }
 
 BasebandType Device::GetBasebandType()
@@ -45,6 +81,17 @@ BasebandType Device::GetBasebandType()
     }
 
     return m_basebandType;
+}
+
+void Device::SetCapability(CAPABILITIES capability, bool isTrue)
+{
+    const DWORD mask = (DWORD)1 << capability;
+    m_capabilitiesMask = isTrue ? m_capabilitiesMask | mask : m_capabilitiesMask & ~mask;
+}
+
+bool Device::IsCapabilitySet(CAPABILITIES capability) const
+{
+    return (m_capabilitiesMask & (DWORD)1 << capability) != (DWORD)0;
 }
 
 BasebandType Device::ReadBasebandType() const
@@ -82,15 +129,38 @@ BasebandType Device::ReadBasebandType() const
     return res;
 }
 
+bool Device::RegisterDriverControlEvents()
+{
+    CAPABILITIES capability = DRIVER_CONTROL_EVENTS;
+
+    bool supportedCommand = GetDriver()->RegisterDriverControlEvents();
+
+    if (!supportedCommand)
+    {
+        SetCapability(capability, false);
+        return false;
+    }
+    SetCapability(capability, true);
+
+    return true;
+}
+
 vector<unique_ptr<HostManagerEventBase>> Device::Poll(void)
 {
     // TODO: implement polling: MB, logs, rgf
 
     vector<unique_ptr<HostManagerEventBase>> events;
-    events.reserve(1U);
+    events.reserve(3U);
     lock_guard<mutex> lock(m_mutex);
 
-    // Poll FW change
+    PollFwVersion(events);
+    PollLogs(events);
+
+    return events;
+}
+
+void Device::PollFwVersion(vector<unique_ptr<HostManagerEventBase>>& events)
+{
     FwVersion fwVersion;
     FwTimestamp fwTimestamp;
 
@@ -102,8 +172,91 @@ vector<unique_ptr<HostManagerEventBase>> Device::Poll(void)
 
         events.emplace_back(new NewDeviceDiscoveredEvent(GetDeviceName(), m_fwVersion, m_fwTimestamp));
     }
+}
 
-    return events;
+void Device::PollLogs(vector<unique_ptr<HostManagerEventBase>>& events)
+{
+    std::vector<log_collector::RawLogLine> rawLogLines;
+
+    for (auto& logCollector : m_logCollectors)
+    {
+        if (!logCollector.second->IsInitialized())
+        {
+            logCollector.second->PrepareLogCollection();
+        }
+        if (logCollector.second->CollectionIsNeeded())
+        {
+            logCollector.second->GetNextLogs(rawLogLines);
+        }
+
+        if (rawLogLines.size() > 0)
+        {
+            events.emplace_back(new NewLogsEvent(GetDeviceName(), CPU_TYPE_FW, rawLogLines));
+        }
+        rawLogLines.clear();
+    }
+}
+
+bool Device::StartLogCollector()
+{
+    for (auto it = m_logCollectors.begin(); it != m_logCollectors.end(); ++it)
+    {
+        it->second->StartCollectingLogs();
+    }
+
+    return true;
+}
+
+bool Device::StopLogCollector()
+{
+    for (auto it = m_logCollectors.begin(); it != m_logCollectors.end(); ++it)
+    {
+        it->second->StopCollectingLogs();
+    }
+
+    return true;
+}
+
+log_collector::LogCollector* Device::GetLogCollector(CpuType type)
+{
+    auto found = m_logCollectors.find(type);
+    if (m_logCollectors.end() != found)
+    {
+        return found->second.get();
+    }
+    return nullptr;
+}
+
+
+bool Device::AddCustomRegister(const string& name, int address)
+{
+    if (m_customRegisters.find(name) != m_customRegisters.end())
+    {
+        // Register already exists
+        return false;
+    }
+
+    m_customRegisters[name] = address;
+
+    return true;
+}
+
+bool Device::RemoveCustomRegister(const string& name)
+{
+    if (m_customRegisters.find(name) == m_customRegisters.end())
+    {
+        // Register already does not exist
+        return false;
+    }
+
+    m_customRegisters.erase(name);
+
+    return true;
+}
+
+std::map<string, int>& Device::GetCustomRegisters()
+{
+    return m_customRegisters;
 }
 
 // Internal service for fetching the FW version and compile time
@@ -112,17 +265,17 @@ bool Device::ReadDeviceFwInfoInternal(FwVersion& fwVersion, FwTimestamp& fwTimes
 {
     // FW version
     bool readOk = m_driver->Read(FW_VERSION_MAJOR_REGISTER, fwVersion.m_major);
-    readOk &= m_driver->Read(FW_VERSION_MINOR_REGISTER,        fwVersion.m_minor);
+    readOk &= m_driver->Read(FW_VERSION_MINOR_REGISTER, fwVersion.m_minor);
     readOk &= m_driver->Read(FW_VERSION_SUB_MINOR_REGISTER, fwVersion.m_subMinor);
-    readOk &= m_driver->Read(FW_VERSION_BUILD_REGISTER,        fwVersion.m_build);
+    readOk &= m_driver->Read(FW_VERSION_BUILD_REGISTER, fwVersion.m_build);
 
     // FW compile time
-    readOk &= m_driver->Read(FW_TIMESTAMP_HOUR_REGISTER,    fwTimestamp.m_hour);
-    readOk &= m_driver->Read(FW_TIMESTAMP_MINUTE_REGISTER,    fwTimestamp.m_min);
-    readOk &= m_driver->Read(FW_TIMESTAMP_SECOND_REGISTER,    fwTimestamp.m_sec);
-    readOk &= m_driver->Read(FW_TIMESTAMP_DAY_REGISTER,        fwTimestamp.m_day);
-    readOk &= m_driver->Read(FW_TIMESTAMP_MONTH_REGISTER,    fwTimestamp.m_month);
-    readOk &= m_driver->Read(FW_TIMESTAMP_YEAR_REGISTER,    fwTimestamp.m_year);
+    readOk &= m_driver->Read(FW_TIMESTAMP_HOUR_REGISTER, fwTimestamp.m_hour);
+    readOk &= m_driver->Read(FW_TIMESTAMP_MINUTE_REGISTER, fwTimestamp.m_min);
+    readOk &= m_driver->Read(FW_TIMESTAMP_SECOND_REGISTER, fwTimestamp.m_sec);
+    readOk &= m_driver->Read(FW_TIMESTAMP_DAY_REGISTER, fwTimestamp.m_day);
+    readOk &= m_driver->Read(FW_TIMESTAMP_MONTH_REGISTER, fwTimestamp.m_month);
+    readOk &= m_driver->Read(FW_TIMESTAMP_YEAR_REGISTER, fwTimestamp.m_year);
 
     if (!readOk)
     {

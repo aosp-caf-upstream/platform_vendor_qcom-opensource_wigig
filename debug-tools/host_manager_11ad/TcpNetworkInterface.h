@@ -27,35 +27,80 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _OSHANDLER_H_
-#define _OSHANDLER_H_
+#ifndef _SOCKET_H_
+#define _SOCKET_H_
+
+#ifdef _WINDOWS
+#pragma comment(lib, "Ws2_32.lib")
+#endif
+
+#include <cstdlib>
+#include <cstdio>
+#include <cerrno>
+#include <cstring>
+#include <string>
+
+#ifdef _WINDOWS
+#include <winsock.h>
+#elif __linux
+#include <unistd.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+#else
+#include <sys/socket.h>
+#include <net/route.h>
+#include <net/if.h>
+#include <arpa/inet.h>
+#endif
+
+#ifdef _WINDOWS
+typedef int socklen_t;
+#endif
 
 
-
-// *************************************************************************************************
-
-/*
-* Class handling specific OS implementations
-*/
-class OsHandler
+namespace TcpNetworkInterfaces
 {
-public:
+    class NetworkInterface
+    {
+    private:
 
-    /*
-    * Function to handle os signals - mostly relevant for linux os.
-    */
-    void HandleOsSignals();
+        int m_fileDescriptor;
+        struct sockaddr_in m_localAddress;
+        char* m_buffer;
+        int m_bufferSize;
+        std::string m_peerName;
 
-    /*
-    * OS agnostic sleep function
-    */
-    static void OsSleep(int sleep_period);
+    public:
 
-    /*
-    * OS agnostic error print function
-    */
-    static void OsError(const char* error_message, ...);
-};
+        NetworkInterface();
+        explicit NetworkInterface(int sockfd);
 
-#endif // _OSHANDLER_H_
+        // Establish Connection
+        void Bind(int portNumber);
+        void Listen(int backlog = 5);
+        NetworkInterface Accept();
 
+        // Send and Receive
+        bool SendString(const std::string& text);
+        bool SendString(const char* szText);
+        bool SendBuffer(const char* pBuf, size_t bufSize);
+
+        const char* Receive(int size = 1024, int flags = 0);
+        const char* BinaryReceive(int size, int flags = 0);
+
+        // Terminate Connection
+        void Close();
+        void Shutdown(int type);
+
+        // Addresses
+        const char* GetPeerName() const;
+        void UpdatePeerNameInternal();
+    };
+
+}
+
+#endif // !_NETWORK_INTERFACE_H_

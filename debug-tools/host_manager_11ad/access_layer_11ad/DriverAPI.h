@@ -34,29 +34,31 @@
 #include <set>
 #include <vector>
 #include <sstream>
+#include <unordered_map>
 
 #include "OperatingSystemConstants.h"
 #include "Definitions.h"
-#include "../DebugLogger.h"
-#include "../Utils.h"
+#include "DebugLogger.h"
+#include "Utils.h"
 
 using namespace std;
 
 class DriverAPI
 {
 public:
-    DriverAPI(string interfaceName)
+    DriverAPI(string interfaceName): m_interfaceName(interfaceName)
     {
-        m_interfaceName = interfaceName;
-        m_initialized = false;
     }
-    virtual ~DriverAPI() {};
+
+    virtual ~DriverAPI() {}
 
     // Base access functions (to be implemented by specific device)
     virtual bool Read(DWORD address, DWORD& value) { return false;  }
     virtual bool ReadBlock(DWORD addr, DWORD blockSize, vector<DWORD>& values) { return false; }
+    virtual bool ReadBlock(DWORD addr, DWORD blockSize, char *arrBlock) { return false;  } // blockSize in bytes
     virtual bool Write(DWORD address, DWORD value) { return false; }
     virtual bool WriteBlock(DWORD addr, vector<DWORD> values) { return false; };
+    virtual bool WriteBlock(DWORD address, DWORD blockSize, const char *valuesToWrite) { return false; }
 
     // PMC functions
     virtual bool AllocPmc(unsigned descSize, unsigned descNum, std::string& outMessage) { return false; }
@@ -64,25 +66,18 @@ public:
     virtual bool CreatePmcFile(unsigned refNumber, std::string& outMessage) { return false; }
     virtual bool FindPmcFile(unsigned refNumber, std::string& outMessage) { return false; }
 
-    virtual bool IsOpen(void) { return m_initialized;  }
+    virtual bool IsOpen(void) { return false; }
     virtual bool Open() { return false;  }
     virtual bool ReOpen() { return false; };
     virtual bool DriverControl(uint32_t Id,
-        const void *inBuf, uint32_t inBufSize,
-        void *outBuf, uint32_t outBufSize) { return false; }
-    virtual DWORD DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DWORD DebugFSFlags)
-    {
-        //do something with params
-        (void)FileName;
-        (void)dataBuf;
-        (void)dataBufLen;
-        (void)DebugFSFlags;
-        return -1;
-    }
+                               const void *inBuf, uint32_t inBufSize,
+                               void *outBuf, uint32_t outBufSize, DWORD* pLastError = nullptr) { return false; }
     virtual void Close() {}
 
     virtual int GetDriverMode(int &currentState) { return false;  }
     virtual bool SetDriverMode(int newState, int &oldState) { return false;  }
+
+    virtual bool RegisterDriverControlEvents() { return false; }
 
     virtual void Reset() {}; // interface reset
 
@@ -91,9 +86,33 @@ public:
         return m_interfaceName;
     }
 
+    bool IsValid()
+    {
+        DWORD value;
+        if (!Read(BAUD_RATE_REGISTER, value)) return false;
+        return IsValidInternal();
+    }
+
 protected:
-    string m_interfaceName;
-    bool m_initialized;
+
+    const string m_interfaceName;
+
+    // Enumeration for commands sent through DriverControl (translating from it to the appropriate command per OS)
+    // Note: It is a contract with DmTools and the Driver, order is important!
+    enum DRIVER_COMMAND
+    {
+        DRIVER_CMD_FW_WMI,
+        DRIVER_CMD_GENERIC_COMMAND,
+        DRIVER_GET_DRIVER_STATISTICS
+    };
+
+    std::unordered_map<DRIVER_COMMAND, uint32_t, hash<int>> m_driverCommandToIoctlMap;
+
+    virtual void InsertDriverCommandsToMap() {}
+
+private:
+
+    virtual bool IsValidInternal() { return true; }
 };
 
 

@@ -33,15 +33,13 @@
 #include <string>
 #include <set>
 #include <unordered_map>
-#include <unordered_set>
 #include <thread>
 #include <future>
 #include <atomic>
 
 #include "HostDefinitions.h"
 #include "Device.h"
-
-using namespace std;
+#include "CommandsExecutor.h"
 
 enum DeviceManagerOperationStatus
 {
@@ -67,40 +65,61 @@ public:
     ~DeviceManager();
     string GetDeviceManagerOperationStatusString(DeviceManagerOperationStatus status);
 
-    DeviceManagerOperationStatus GetDevices(set<string>&);
-    DeviceManagerOperationStatus Read(string deviceName, DWORD address, DWORD& value);
-    DeviceManagerOperationStatus Write(string deviceName, DWORD address, DWORD value);
-    DeviceManagerOperationStatus ReadBlock(string deviceName, DWORD address, DWORD blockSize, vector<DWORD>& values);
-    DeviceManagerOperationStatus WriteBlock(string deviceName, DWORD address, const vector<DWORD>& values);
-    DeviceManagerOperationStatus InterfaceReset(string deviceName);
-    DeviceManagerOperationStatus SwReset(string deviceName);
+    DeviceManagerOperationStatus GetDevices(std::set<std::string>& devicesNames);
+    DeviceManagerOperationStatus Read(const std::string& deviceName, DWORD address, DWORD& value);
+    DeviceManagerOperationStatus Write(const std::string& deviceName, DWORD address, DWORD value);
+    DeviceManagerOperationStatus ReadBlock(const std::string& deviceName, DWORD address, DWORD blockSize, vector<DWORD>& values);
+    DeviceManagerOperationStatus WriteBlock(const std::string& deviceName, DWORD address, const vector<DWORD>& values);
+    DeviceManagerOperationStatus InterfaceReset(const std::string& deviceName);
+    DeviceManagerOperationStatus SwReset(const std::string& deviceName);
 
-    DeviceManagerOperationStatus AllocPmc(string deviceName, unsigned descSize, unsigned descNum, std::string& errorMsg);
-    DeviceManagerOperationStatus DeallocPmc(string deviceName, std::string& outMessage);
-    DeviceManagerOperationStatus CreatePmcFile(string deviceName, unsigned refNumber, std::string& outMessage);
-    DeviceManagerOperationStatus FindPmcFile(string deviceName, unsigned refNumber, std::string& outMessage);
+    DeviceManagerOperationStatus AllocPmc(const std::string& deviceName, unsigned descSize, unsigned descNum, std::string& errorMsg);
+    DeviceManagerOperationStatus DeallocPmc(const std::string& deviceName, std::string& outMessage);
+    DeviceManagerOperationStatus CreatePmcFile(const std::string& deviceName, unsigned refNumber, std::string& outMessage);
+    DeviceManagerOperationStatus FindPmcFile(const std::string& deviceName, unsigned refNumber, std::string& outMessage);
 
-    DeviceManagerOperationStatus SendWmi(string deviceName, DWORD command, const vector<DWORD>& payload);
-    DeviceManagerOperationStatus OpenInterface(string deviceName); // for backward compatibility
-    DeviceManagerOperationStatus CloseInterface(string deviceName);
-    DeviceManagerOperationStatus SetDriverMode(string deviceName, int newMode, int& oldMode);
-    DeviceManagerOperationStatus DriverControl(string deviceName, uint32_t Id, const void *inBuf, uint32_t inBufSize, void *outBuf, uint32_t outBufSize);
-    DeviceManagerOperationStatus GetDeviceSilentMode(string deviceName, bool& silentMode);
-    DeviceManagerOperationStatus SetDeviceSilentMode(string deviceName, bool silentMode);
+    DeviceManagerOperationStatus SendWmi(const std::string& deviceName, DWORD command, const std::vector<DWORD>& payload);
+    DeviceManagerOperationStatus OpenInterface(const std::string& deviceName); // for backward compatibility
+    DeviceManagerOperationStatus CloseInterface(const std::string& deviceName);
+    DeviceManagerOperationStatus SetDriverMode(const std::string& deviceName, int newMode, int& oldMode);
+    DeviceManagerOperationStatus DriverControl(const std::string& deviceName, uint32_t Id, const void *inBuf, uint32_t inBufSize, void *outBuf, uint32_t outBufSize);
+    DeviceManagerOperationStatus GetDeviceSilentMode(const std::string& deviceName, bool& silentMode);
+    DeviceManagerOperationStatus SetDeviceSilentMode(const std::string& deviceName, bool silentMode);
+    DeviceManagerOperationStatus GetDeviceCapabilities(const std::string& deviceName, DWORD& capabilities);
+
+    // Host Status Update
+    bool GetDeviceStatus(std::vector<DeviceData>& devicesData);
+
+    bool AddRegister(const std::string& deviceName, const std::string& registerName, int address);
+    bool RemoveRegister(const std::string& deviceName, const std::string& registerName);
+
+    // Log collection
+    bool GetLogCollectionMode() const;
+    void SetLogCollectionMode(bool collectLogs);
+    bool SetLogCollectionConfiguration(const vector<string>& deviceNames, const vector<string>& cpuTypeNames, const string& parameter, const string& value, string& errorMessage);
+    string GetLogCollectionConfiguration(const vector<string>& deviceNames, const vector<string>& cpuTypeNames, string parameter);
+    string DumpLogCollectionConfiguration(const vector<string>& deviceNames, const vector<string>& cpuTypeNames);
 
 private:
     void PeriodicTasks(std::promise<void>& eventsTCPServerReadyPromise);
     void UpdateConnectedDevices();
-    void CreateDevice(string deviceName);
-    void DeleteDevice(string deviceName);
-    bool IsDeviceSilent(string deviceName);
-    string GetStatusBarString(shared_ptr<Device> device);
+    void CreateDevice(const std::string& deviceName);
+    void DeleteDevice(const std::string& deviceName);
+    bool IsDeviceSilent(const std::string& deviceName);
+    std::shared_ptr<Device> GetDeviceByName(const std::string& deviceName);
 
-    unordered_map<string, shared_ptr<Device>> m_devices; // map from unique string (unique inside a host) to a connected device
+    std::unordered_map<std::string, std::shared_ptr<Device>> m_devices; // map from unique string (unique inside a host) to a connected device
     unsigned const m_deviceManagerRestDurationMs;
-    thread m_deviceManager;
-    mutex m_connectedDevicesMutex;
-    atomic<bool> m_terminate;
+    std::thread m_deviceManager;
+    std::mutex m_connectedDevicesMutex;
+    std::atomic<bool> m_terminate;
+
+    // Collect logs flag
+    bool m_collectLogs;
+
+    const static std::unordered_map<int, std::string> m_rfTypeToString;
+    const static std::unordered_map<int, std::string> m_basebandTypeToString;
+    const static std::unordered_map<int, std::string> m_boardfileTypeToString;
 };
 
 #endif // !_DEVICEMANAGER_H_

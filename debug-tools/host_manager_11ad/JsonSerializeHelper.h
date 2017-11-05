@@ -30,6 +30,10 @@
 #define _11AD_JSON_SERIALIZE_HELPER_H_
 
 #include <ostream>
+#include <string>
+#include <vector>
+#include <memory>
+#include "DebugLogger.h"
 
 // Interface for composite types to be used as part of event payload
 class JsonSerializable
@@ -44,58 +48,59 @@ public:
 class JsonSerializeHelper final
 {
 public:
-    JsonSerializeHelper(std::ostream& os) : m_os(os)
-    {
-        StartSerialization();
-    }
+    explicit JsonSerializeHelper(std::ostream& os);
 
-    ~JsonSerializeHelper()
-    {
-        FinishSerialization();
-    }
+    ~JsonSerializeHelper();
 
-    void Serialize(const char* key, const string& value) const
-    {
-        // last comma does not prevent correct deserialization
-        m_os << R"_(")_" << key << R"_(":")_" << value << R"_(",)_";
-    }
+    void Serialize(const char* key, const std::string& value);
 
-    void Serialize(const char* key, const char* value) const
-    {
-        // last comma does not prevent correct deserialization
-        m_os << R"_(")_" << key << R"_(":")_" << value << R"_(",)_";
-    }
+    void Serialize(const char* key, const char* value);
 
-    template<class T>
-    void Serialize(const char* key, const T& value) const
-    {
-        // last comma does not prevent correct deserialization
-        m_os << R"_(")_" << key << R"_(":)_" << value << ",";
-    }
+    void Serialize(const char* key, const unsigned long long value);
 
     // Serialization service for composite member that implements the JsonSerializable interface
-    void SerializeComposite(const char* key, const JsonSerializable& value) const
+    void SerializeComposite(const char* key, const JsonSerializable& value);
+
+    void SerializeCompositeArray(const char* key, const std::vector<std::unique_ptr<JsonSerializable>>& values);
+
+    // Type of template can be any iterable container
+    template<class T>
+    void SerializeStringArray(const char* key, const T& values)
     {
-        // last comma does not prevent correct deserialization
-        m_os << R"_(")_" << key << R"_(":)_";
-        value.ToJson(m_os);
-        m_os << ",";
+        m_os << R"_(")_" << key << R"_(":[)_";
+
+        bool first = true;
+        for (auto & val : values)
+        {
+            if (!first) {
+                m_os << ",";
+            }
+            first = false;
+            m_os << R"_(")_" << val << R"_(")_";
+        }
+        m_os << "],";
     }
+
+    // Encode given binary array as Base64 string
+    static std::string Base64Encode(const std::vector<unsigned char>& binaryData);
+    static std::string Base64Encode(const unsigned char binaryData[], unsigned length);
+
+    // Decode the string given in Base64 format
+    static bool Base64Decode(const std::string& base64Data, std::vector<unsigned char>& binaryData);
 
 private:
     std::ostream& m_os;
 
-    void StartSerialization() const
+    void StartSerialization()
     {
         m_os << "{";
     }
 
-    void  FinishSerialization() const
+    void  FinishSerialization()
     {
         m_os.seekp(-1, m_os.cur); // override the last comma
         m_os << "}";
     }
 };
-
 
 #endif // _11AD_JSON_SERIALIZE_HELPER_H_

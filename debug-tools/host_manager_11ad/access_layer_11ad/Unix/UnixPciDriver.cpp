@@ -128,23 +128,24 @@ bool UnixPciDriver::Write(DWORD address, DWORD value)
 
     return true;
 }
-bool UnixPciDriver::WriteBlock(DWORD addr, vector<DWORD> values)
-{
-    char* valuesToWrite = (char*)&values[0];
-    int sizeToWrite = values.size() * 4;
 
+bool UnixPciDriver::WriteBlock(DWORD address, DWORD blockSize, const char *valuesToWrite)
+{
     IoctlIOBlock io;
     io.op = EP_OPERATION_WRITE;
-    io.addr = addr;
-    io.size = sizeToWrite;
+    io.addr = address;
+    io.size = blockSize;
     io.buf = (void*)valuesToWrite;
 
     return SendRWBIoctl(io, m_fileDescriptor, m_interfaceName.c_str());
 }
 
-bool UnixPciDriver::IsOpened(void)
+bool UnixPciDriver::WriteBlock(DWORD addr, vector<DWORD> values)
 {
-    return m_initialized;
+    char* valuesToWrite = (char*)&values[0];
+    DWORD sizeToWrite = values.size() * 4;
+
+    return WriteBlock(addr, sizeToWrite, valuesToWrite);
 }
 
 string GetInterfaceNameFromEP(string pciEndPoint)
@@ -164,7 +165,7 @@ string GetInterfaceNameFromEP(string pciEndPoint)
     dirent* de; // read interface name. We assume there is only one folder, if not we take the first one
     do
     {
-      de = readdir(dp);
+        de = readdir(dp);
     } while ((de != NULL) && ((strncmp(CURRENT_DIRECTORY, de->d_name, strlen(CURRENT_DIRECTORY)) == 0) || (strncmp(PARENT_DIRECTORY, de->d_name, strlen(PARENT_DIRECTORY)) == 0)));
     if (NULL == de)
     {
@@ -229,7 +230,7 @@ set<string> UnixPciDriver::Enumerate()
 
 bool UnixPciDriver::Open()
 {
-    if(IsOpened())
+    if(m_initialized)
     {
         return true;
     }
@@ -273,7 +274,7 @@ bool UnixPciDriver::SetDebugFsPath() // assuming m_interfaceName is set
     dirent* de;// read phy name (phy folder is named phyX where X is a digit). We assume there is only one folder, if not we take the first one
     do
     {
-      de = readdir(dp);
+        de = readdir(dp);
     } while ((de != NULL) && (strncmp(PHY, de->d_name, strlen(PHY)) != 0));
     if (NULL == de)
     {
@@ -299,21 +300,6 @@ bool UnixPciDriver::SetDebugFsPath() // assuming m_interfaceName is set
 bool UnixPciDriver::ReOpen()
 {
     return Open();
-}
-
-bool UnixPciDriver::InternalOpen()
-{
-    return true;
-}
-
-DWORD UnixPciDriver::DebugFS(char *FileName, void *dataBuf, DWORD dataBufLen, DWORD DebugFSFlags)
-{
-    //do something with params
-    (void)FileName;
-    (void)dataBuf;
-    (void)dataBufLen;
-    (void)DebugFSFlags;
-    return 0;
 }
 
 bool UnixPciDriver::AllocPmc(unsigned descSize, unsigned descNum, string& outMessage)
@@ -401,8 +387,8 @@ void UnixPciDriver::Reset()
 }
 
 bool UnixPciDriver::DriverControl(uint32_t Id,
-    const void *inBuf, uint32_t inBufSize,
-    void *outBuf, uint32_t outBufSize)
+                                  const void *inBuf, uint32_t inBufSize,
+                                  void *outBuf, uint32_t outBufSize)
 {
     //do something with params
     (void)Id;
@@ -453,7 +439,7 @@ bool UnixPciDriver::SendRWBIoctl(IoctlIOBlock & io, int fd, const char* interfac
 bool UnixPciDriver::ValidateInterface()
 {
     IoctlIO io;
-    io.addr = 0x880050; //baud rate
+    io.addr = BAUD_RATE_REGISTER;
     io.op = EP_OPERATION_READ;
 
     if(SendRWIoctl(io, m_fileDescriptor, m_interfaceName.c_str()))
@@ -462,6 +448,16 @@ bool UnixPciDriver::ValidateInterface()
     }
 
     return false;
+}
+
+bool UnixPciDriver::IsValidInternal()
+{
+    if(-1 == access(m_debugFsPath.c_str(), F_OK)) // didn't find debug FS
+    {
+        return false;
+    }
+
+    return true;
 }
 
 string UnixPciDriver::NameDevice(string interfaceName)
