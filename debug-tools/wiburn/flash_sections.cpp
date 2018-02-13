@@ -60,6 +60,11 @@ void configuration_id_tag_t::disp(const char *name)
     //unused param
     (void)name;
     BYTE *null_terminated_buffer = new BYTE [sizeof (id) + 1];
+    if (!null_terminated_buffer)
+    {
+        return;
+    }
+
     memcpy(null_terminated_buffer, id, sizeof (id));
     null_terminated_buffer[sizeof (id)] = 0;
     printf("CONFIGURATION_ID = %s\n", null_terminated_buffer);
@@ -1346,6 +1351,12 @@ void usb_section_t::handle_ini_section (const ini_section_t &ini_section)
 {
     this->m_size = ini_section.size() * sizeof (IMAGE);
     m_buffer = new IMAGE [ini_section.size()];
+    if (!m_buffer)
+    {
+        ERR("Cannot allocate a buffer of size %lu\n", ini_section.size());
+        EXIT (-1);
+    }
+
     memset((void*)m_buffer, -1, this->m_size);
 
     ini_section_t::const_iterator sec_iter;

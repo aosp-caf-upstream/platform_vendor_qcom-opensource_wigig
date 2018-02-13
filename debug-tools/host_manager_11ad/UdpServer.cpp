@@ -79,6 +79,12 @@ void UdpServer::BlockingReceive()
     do
     {
         const char* incomingMessage = m_pSocket->Receive(m_maxMessageLength);
+        if (nullptr == incomingMessage)
+        {
+            LOG_ERROR << "Got NULL instead of incoming UDP message" << endl;
+            continue;
+        }
+
         LOG_VERBOSE << "Got Udp message: " << incomingMessage << endl;
         ResponseMessage referencedResponse;
         m_CommandHandler.ExecuteCommand(incomingMessage, referencedResponse);

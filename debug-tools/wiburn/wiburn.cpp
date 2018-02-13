@@ -371,6 +371,12 @@ void sub_main(bool burn,
         }
 
         BYTE *tmp_buffer = new BYTE [int_length];
+        if (!tmp_buffer)
+        {
+            ERR("Cannot allocate temp buffer of size %d\n", int_length);
+            EXIT(-1);
+        }
+
         g_flash->read(int_offset, int_length, tmp_buffer);
 
         if (read_formatted) {

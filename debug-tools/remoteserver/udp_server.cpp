@@ -194,6 +194,11 @@ void* UdpServer::start_udp_server(void* unused)
     }
 
     char* buf = new char[MAX_INPUT_BUF];
+    if (!buf)
+    {
+        LOG_ERROR << "Cannot allocate receive buffer for UDP messages" << std::endl;
+        return NULL;
+    }
 
     do
     {

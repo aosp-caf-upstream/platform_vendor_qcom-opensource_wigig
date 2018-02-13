@@ -71,6 +71,12 @@ void *Server::server_process(void *ptr)
     connection_par_t *par = (connection_par_t*)ptr;
     iface = new CmdIface();
     buf = new char[MAX_INPUT_BUF+1];
+    if (!buf)
+    {
+        LOG_ERROR << "Cannot allocate server receive buffer" << std::endl;
+        pthread_exit(0);
+    }
+
     memset(buf, 0, MAX_INPUT_BUF+1);
     rw = read(par->sock, buf, MAX_INPUT_BUF);
 

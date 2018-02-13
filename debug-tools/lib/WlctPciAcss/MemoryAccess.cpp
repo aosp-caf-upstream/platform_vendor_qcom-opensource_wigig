@@ -41,7 +41,13 @@ CMemoryAccess::CMemoryAccess(const TCHAR* tchDeviceName, DType devType)
 
 	deviceType = devType;
 	m_pMem = new char[m_size];
-	memset(m_pMem, 0, m_size);
+        if (!m_pMem)
+        {
+            LOG_MESSAGE_ERROR(_T("Cannot allocate memory access buffer"));
+            exit(1);
+        }
+
+        memset(m_pMem, 0, m_size);
 }
 
 CMemoryAccess::~CMemoryAccess(void)

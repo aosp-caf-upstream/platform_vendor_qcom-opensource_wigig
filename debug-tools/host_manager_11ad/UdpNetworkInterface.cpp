@@ -130,6 +130,12 @@ const char* UdpNetworkInterface::Receive(int len)
 {
 #ifndef _WINDOWS
     char* buf = new char[len];
+    if (nullptr == buf)
+    {
+        LOG_ERROR << "Cannot allocate receive buffer for UDP messages" << std::endl;
+        return "";
+    }
+
     if (recvfrom(m_socket, buf, len, 0, NULL, 0) < 0)
     {
         LOG_WARNING << "Can't receive from port " << m_portIn << std::endl;

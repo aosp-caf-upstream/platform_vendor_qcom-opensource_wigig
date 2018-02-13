@@ -562,6 +562,8 @@ int CPciDeviceAccess::wb(DWORD addr, DWORD blockSize, const char *arrBlock)
 
     PFILTER_WRITE_BLOCK	pinParams;
     char* p = new char[2*sizeof(ULONG) + blockSize];
+    if (!p) return -1;
+
     pinParams = (PFILTER_WRITE_BLOCK)p;
     pinParams->address = addr;
 

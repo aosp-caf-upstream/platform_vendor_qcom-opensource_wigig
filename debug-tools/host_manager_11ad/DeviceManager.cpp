@@ -826,8 +826,8 @@ bool DeviceManager::GetDeviceStatus(vector<DeviceData>& devicesData)
         const auto boardfileTypeIter = m_boardfileTypeToString.find((value & 0xFFF000) >> 12);
         deviceData.m_boardFile = boardfileTypeIter != m_boardfileTypeToString.cend() ? boardfileTypeIter->second : std::string("UNDEFINED");
 
-        DWORD rfConnected;
-        DWORD rfEnabled;
+        DWORD rfConnected = 0;
+        DWORD rfEnabled = 0;
         device.second->GetDriver()->Read(RF_CONNECTED_REG, rfConnected);
         device.second->GetDriver()->Read(RF_ENABLED_REG, rfEnabled);
         rfEnabled = rfEnabled >> 8;
@@ -1105,7 +1105,7 @@ void DeviceManager::SetLogCollectionMode(bool collectLogs)
 
 bool DeviceManager::SetLogCollectionConfiguration(const vector<string>& deviceNames, const vector<string>& cpuTypeNames, const string& parameter, const string& value, string& errorMessage)
 {
-    bool success;
+    bool success = true;
     errorMessage = "";
     stringstream errorMessageSs;
     for (auto& deviceName : deviceNames)

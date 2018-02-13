@@ -373,6 +373,13 @@ int CmdIface::cmd_rb(char *interface, unsigned int address, unsigned int num_reg
     }
 
     unsigned int *val = new unsigned int[num_regs];
+
+    if (!val)
+    {
+        m_Reply = "0xDEADDEAD\r\n";
+        return 0;
+    }
+
     int rc = readBlock(handler, address, num_regs*sizeof(unsigned int), (char*)val);
 
     if (rc == 0)

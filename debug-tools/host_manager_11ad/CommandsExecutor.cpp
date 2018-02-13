@@ -264,7 +264,7 @@ bool CommandsExecutor::AddTestDeviceRegister(const std::string& deviceName, cons
 
 bool CommandsExecutor::RemoveTestDeviceRegister(const std::string& deviceName, const std::string& name)
 {
-    for (size_t i = 0; i < sizeof(deviceNames); i++)
+    for (size_t i = 0; i < deviceNames.size(); i++)
     {
         if (deviceNames[i] == deviceName)
         {

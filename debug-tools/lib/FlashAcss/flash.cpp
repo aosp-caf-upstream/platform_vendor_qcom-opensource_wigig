@@ -51,7 +51,15 @@ flash::flash(DType device_type)
 	m_hw_read_chunk_size = 256;
 	m_hw_write_chunk_size = 256;
 	m_page_erased = new bool [m_size / FLASH_PAGE_SIZE];
-	memset(m_page_erased, 0, m_size / FLASH_PAGE_SIZE);
+
+        if (!m_page_erased)
+        { 
+            ERR("Cannot allocate page_erased buffer of size %d\n", m_size / FLASH_PAGE_SIZE);
+            exit(1);
+        }
+
+        memset(m_page_erased, 0, m_size / FLASH_PAGE_SIZE);
+
 	m_buffer = NULL;
 	update_erased_flash(false);
 
@@ -70,7 +78,7 @@ flash::~flash(void)
 
     free_buffer();
 
-    delete m_page_erased;
+    delete[] m_page_erased;
 }
 
 void flash::free_buffer ()
@@ -445,6 +453,11 @@ int flash::program( const u_int32_t address, const u_int32_t length, const BYTE 
 
     u_int32_t offset = 0;
     BYTE *verify_buffer = new BYTE[FLASH_PAGE_SIZE];
+    if (!verify_buffer) {
+        ERR("Cannot allocate verify buffer\n");
+        return -1;
+    }
+
     u_int32_t loop = 0;
     bool dbg_verify = false;
     while (!m_bExit && offset < length )
@@ -720,6 +733,11 @@ int flash_file::open (const char *device_name, DType dtype, bool ignore_lock = t
 //    m_device_name = device_name;
     m_handler = fopen( device_name, "rb+");
     m_buffer = new char [m_size];
+    if (!m_buffer) {
+        ERR("Cannot allocate a buffer of size %u\n", m_size);
+        return (-1);
+    }
+
     if (0 == m_handler) { // File doesn't exist
         if (g_debug) DBG("file %s type %d does not exist. Creating...\n", device_name, dtype);
         m_handler = fopen( device_name, "wb");
